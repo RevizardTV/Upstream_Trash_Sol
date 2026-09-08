@@ -1,0 +1,52 @@
+name: TiDB Python Workflow
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip' # Speeds up subsequent runs by caching dependencies
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Verify SSL Certificates
+        # This confirms the runner has the CA certs TiDB needs for secure transport
+        run: |
+          if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
+            echo "SSL Certificates found."
+          else
+            echo "SSL Certificates missing! This might cause connection issues."
+            exit 1
+          fi
+
+      - name: Run Python Application
+        env:
+          DB_HOST: ${{ secrets.TIDB_HOST }}
+          DB_USER: ${{ secrets.TIDB_USER }}
+          DB_PASSWORD: ${{ secrets.TIDB_PASSWORD }}
+          DB_NAME: ${{ secrets.TIDB_DATABASE }}
+          DB_PORT: 4000
+          # Ensure there is a space after the colon
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          # This tells Python to look for 'python_components' from the root
+          PYTHONPATH: ${{ github.workspace }}
+        
+        
+        # This will now use your updated DB_URL property with the ssl_ca parameter
+        run: python -m py_scripts.database
