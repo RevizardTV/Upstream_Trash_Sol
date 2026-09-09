@@ -67,15 +67,6 @@ class OTPVerify(BaseModel):
     email_address: EmailStr
     otp_code: str
 
-class ProfileCreateSchema(BaseModel):
-    email: EmailStr
-    full_name: str
-    phone_number: str
-    city: str
-    postal_code: str
-    premise_type: str = "house"
-    household_size: int = 1
-    upi_id: str | None = None
 
 
 # Page Route Handlers
@@ -194,6 +185,33 @@ async def complete_profile(data: ProfileCreateSchema, db: Session = Depends(get_
     db.refresh(user)
     return {"status": "success", "message": "Profile saved successfully!"}
 
+class ProfileCreateSchema(BaseModel):
+    email: EmailStr
+    full_name: str
+    phone_number: str
+    city: str
+    postal_code: str
+    premise_type: str = "house"
+    household_size: int = 1
+    upi_id: str | None = None
+
+@app.post("/api/auth/complete-profile")
+async def save_user_profile(data: ProfileCreateSchema, db: Session = Depends(get_db)):
+    # 1. Query for existing record by unique email
+    user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
+    
+    if not user:
+        # 2. Insert new record
+        user = UserProfile(**data.model_dump())
+        db.add(user)
+    else:
+        # 3. Update existing profile fields
+        for field, value in data.model_dump().items():
+            setattr(user, field, value)
+            
+    db.commit()
+    db.refresh(user)
+    return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
 
 # Admin & Inspection Utilities
 @app.get("/api/auth/redis-inspect")

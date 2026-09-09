@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Generator, Optional
-from sqlalchemy import create_engine, text, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
+from sqlalchemy import create_engine, text, String,ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session,relationship
 from py_scripts.config import config
 
 # 1. Database Connection Engine
@@ -36,6 +36,20 @@ class UserProfile(Base):
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc)
     )
+
+
+
+class RecyclingEntry(Base):
+    __tablename__ = "recycling_entries"
+
+    entry_id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_profiles.id"))
+    waste_category: Mapped[str] = mapped_column(String(50))
+    weight_kg: Mapped[float]
+    payout_amount: Mapped[float]
+    
+    # Relationship allows accessing profile via entry.user
+    user: Mapped["UserProfile"] = relationship()
 
 # 5. FastAPI Database Dependency
 def get_db() -> Generator[Session, None, None]:
