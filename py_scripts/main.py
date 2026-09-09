@@ -227,3 +227,7 @@ async def serve_pending_payments():
 async def serve_payment_info():
     return FileResponse("webpages/payment_info.html")
 
+@app.get("/register-profile")
+async def serve_profile_registration():
+    return FileResponse("webpages/register_profile.html")
+
