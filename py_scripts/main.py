@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 # main.py snippet
 import redis.asyncio as redis
-from emailSend import send_email
+from py_scripts.emailSend import send_email
 # Import your Redis-backed login helper functions
 import py_scripts.login as login
 from py_scripts.config import config
