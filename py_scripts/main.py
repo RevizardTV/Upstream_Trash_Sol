@@ -229,5 +229,6 @@ async def serve_payment_info():
 
 @app.get("/register-profile")
 async def serve_profile_registration():
+    print("REGISTER PROFILE TRIGGERED")
     return FileResponse("webpages/register_profile.html")
 
