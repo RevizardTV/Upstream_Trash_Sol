@@ -10,12 +10,19 @@ from pydantic import BaseModel, EmailStr
 import redis.asyncio as redis
 from resend.exceptions import ResendError
 
+# Database Imports
+from sqlalchemy.orm import Session
+from py_scripts.database import Base, UserProfile, engine, get_db
+
 from py_scripts.config import config
 from py_scripts.emailSend import send_email
 import py_scripts.login as login
 
 # Ensure project directory is in PATH
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Auto-create tables on startup
+Base.metadata.create_all(bind=engine)
 
 # Redis Connection Initialization
 redis_url = os.getenv("REDIS_URL") or getattr(config, "REDIS_URL", None)
@@ -60,6 +67,16 @@ class OTPVerify(BaseModel):
     email_address: EmailStr
     otp_code: str
 
+class ProfileCreateSchema(BaseModel):
+    email: EmailStr
+    full_name: str
+    phone_number: str
+    city: str
+    postal_code: str
+    premise_type: str = "house"
+    household_size: int = 1
+    upi_id: str | None = None
+
 
 # Page Route Handlers
 @app.get("/")
@@ -74,6 +91,22 @@ async def serve_login():
 async def serve_payment():
     return FileResponse("webpages/payment.html")
 
+@app.get("/register-payment")
+async def serve_register_payment():
+    return FileResponse("webpages/register_payment.html")
+
+@app.get("/pending-payments")
+async def serve_pending_payments():
+    return FileResponse("webpages/pending_payments.html")
+
+@app.get("/payment-info")
+async def serve_payment_info():
+    return FileResponse("webpages/payment_info.html")
+
+@app.get("/register-profile")
+async def serve_profile_registration():
+    return FileResponse("webpages/register_profile.html")
+
 
 # Authentication Endpoints
 @app.post("/api/auth/request-otp")
@@ -84,7 +117,6 @@ async def request_otp(data: OTPRequest, request: Request):
     else:
         client_ip = request.client.host if request.client else "127.0.0.1"
     
-    # 1. Generate OTP and store in Redis
     otp, error = await login.generate_otp(data.email_address, client_ip)
     
     if error or not otp:
@@ -93,7 +125,6 @@ async def request_otp(data: OTPRequest, request: Request):
             detail=error or "Failed to generate OTP code."
         )
     
-    # 2. Dispatch email with Resend
     try:
         await send_email(
             to_email=data.email_address,
@@ -147,6 +178,21 @@ async def verify_otp_route(data: OTPVerify):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while verifying the OTP."
         )
+
+@app.post("/api/auth/complete-profile")
+async def complete_profile(data: ProfileCreateSchema, db: Session = Depends(get_db)):
+    user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
+    
+    if not user:
+        user = UserProfile(**data.model_dump())
+        db.add(user)
+    else:
+        for key, value in data.model_dump().items():
+            setattr(user, key, value)
+            
+    db.commit()
+    db.refresh(user)
+    return {"status": "success", "message": "Profile saved successfully!"}
 
 
 # Admin & Inspection Utilities
@@ -213,22 +259,3 @@ async def emergency_reset(x_secret_key: str = Header(...)):
     
     await redis_client.flushall()
     return {"status": "success", "message": "Database cleared successfully"}
-
-# Page Route Handlers
-@app.get("/register-payment")
-async def serve_register_payment():
-    return FileResponse("webpages/register_payment.html")
-
-@app.get("/pending-payments")
-async def serve_pending_payments():
-    return FileResponse("webpages/pending_payments.html")
-
-@app.get("/payment-info")
-async def serve_payment_info():
-    return FileResponse("webpages/payment_info.html")
-
-@app.get("/register-profile")
-async def serve_profile_registration():
-    print("REGISTER PROFILE TRIGGERED")
-    return FileResponse("webpages/register_profile.html")
-
