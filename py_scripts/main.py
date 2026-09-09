@@ -226,3 +226,4 @@ async def serve_pending_payments():
 @app.get("/payment-info")
 async def serve_payment_info():
     return FileResponse("webpages/payment_info.html")
+
