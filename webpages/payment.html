@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoRecycle - Payment Dashboard</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- Execute auth guard immediately before page body renders -->
+    <script src="/static/js/authguard.js"></script>
+</head>
+<body>
+    <header>
+        <h1>PAYMENT & PAYOUT DASHBOARD</h1>
+        <button id="logoutBtn" class="btn">Logout</button>
+    </header>
+
+    <main>
+        <div class="card">
+            <span class="status-badge">Payment Scheduled</span>
+            <h2>Payout Receipt</h2>
+            <p class="subtitle">Summary of your requested waste payout.</p>
+
+            <div class="receipt-details">
+                <div class="receipt-row">
+                    <span>Waste Category:</span>
+                    <strong id="summary-category">E-Waste</strong>
+                </div>
+                <div class="receipt-row">
+                    <span>Estimated Weight:</span>
+                    <strong id="summary-weight">10 kg</strong>
+                </div>
+                <div class="receipt-row total">
+                    <span>Total Payout:</span>
+                    <span id="summary-total">₹250</span>
+                </div>
+            </div>
+            <button id="confirmBtn" class="btn">Confirm Request</button>
+        </div>
+    </main>
+
+    <script src="/static/js/payment.js"></script>
+</body>
+</html>
