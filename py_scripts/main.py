@@ -128,6 +128,8 @@ async def emergency_reset(x_secret_key: str = Header(...)):
     return {"status": "success", "message": "Database cleared successfully"}
 
 # Request OTP with detailed Resend error reporting
+from resend.exceptions import ResendError
+
 @app.post("/api/auth/request-otp")
 async def request_otp(data: OTPRequest, request: Request):
     client_ip = request.headers.get("x-forwarded-for")
@@ -136,24 +138,35 @@ async def request_otp(data: OTPRequest, request: Request):
     else:
         client_ip = request.client.host if request.client else "127.0.0.1"
     
+    # 1. Generate OTP and store in Redis
     otp, error = await login.generate_otp(data.email_address, client_ip)
     
     if error or not otp:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=error or "Failed to generate OTP")
-        
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, 
+            detail=error or "Failed to generate OTP code."
+        )
+    
+    print("OTP GENERATION PASSED")
+    # 2. Dispatch email with detailed Resend API error reporting
     try:
+        print("RESEND ATTEMPTED")
         await send_email(
             to_email=data.email_address,
-            subject="EcoRecycle - Your Verification Code",
+            subject="EcoRecycle - Your Login OTP",
             body=otp
         )
         return {"status": "success", "message": "OTP code dispatched successfully"}
+        
     except ResendError as re_err:
-        print(f"CRITICAL RESEND API ERROR: {re_err}")
+        print(f"RESEND API DISPATCH ERROR: {re_err}")
         raise HTTPException(
-            status_code=500, 
-            detail=f"Email dispatch failed: Check RESEND_API_KEY or verified sender domain. ({str(re_err)})"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Resend Mail Error: {str(re_err)}"
         )
     except Exception as e:
-        print(f"Unexpected Email Error: {e}")
-        raise HTTPException(status_code=500, detail="OTP generated, but email delivery failed.")
+        print(f"UNEXPECTED MAIL SYSTEM ERROR: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="OTP saved to database, but email delivery service failed."
+        )
