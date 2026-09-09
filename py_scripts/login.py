@@ -4,7 +4,7 @@ from redis.asyncio import Redis
 from typing import cast,Any
 import os
 import sys
-from config import config
+from py_scripts.config import config
 import logging
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
