@@ -5,23 +5,24 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
-# Mount the 'static' folder to serve CSS and JS assets
+# Mount the static directory to serve /css and /js
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Endpoint 1: Home Page
+# Mount image_assets directory for SVGs or photos if needed
+app.mount("/image_assets", StaticFiles(directory="image_assets"), name="image_assets")
+
+# Serve individual page views from /webpages/
 @app.get("/")
-async def read_home():
-    return FileResponse("templates/index.html")
+async def serve_home():
+    return FileResponse("webpages/index.html")
 
-# Endpoint 2: Login Page
 @app.get("/login")
-async def read_login():
-    return FileResponse("templates/login.html")
+async def serve_login():
+    return FileResponse("webpages/login.html")
 
-# Endpoint 3: Payment / Payout Dashboard Page
 @app.get("/payment")
-async def read_payment():
-    return FileResponse("templates/payment.html")
+async def serve_payment():
+    return FileResponse("webpages/payment.html")
 
 if __name__ == "__main__":
     import uvicorn
