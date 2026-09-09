@@ -76,25 +76,34 @@ window.redis = async function() {
 // 2. Global Database Reset Utility
 window.resetDatabase = async function() {
     console.log("%c⚡ Sending emergency reset command to Redis...", "color: #f59e0b; font-weight: bold;");
-    try {
-        const response = await fetch("/emergency-reset", {
-            method: "POST",
-            headers: {
-                "X-Secret-Key": ADMIN_SECRET_KEY 
-            }
-        });
+    
+    const endpoints = ["/api/auth/emergency-reset", "/emergency-reset"];
+    let success = false;
 
-        if (response.ok) {
-            const data = await response.json();
-            console.log("%c✅ Redis database cleared successfully!", "color: #34d399; font-weight: bold;", data);
-            sessionStorage.clear();
-            console.log("%c🔄 Session storage cleared. Reloading page...", "color: #38bdf8;");
-            window.location.reload(); 
-        } else {
-            console.error("❌ Reset failed. Verify key or route configuration.");
-        }
-    } catch (err) {
-        console.error("❌ Reset request failed:", err);
+    for (const path of endpoints) {
+        try {
+            const response = await fetch(path, {
+                method: "POST",
+                headers: {
+                    "X-Secret-Key": ADMIN_SECRET_KEY,
+                    "Content-Type": "application/json"
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log("%c✅ Redis database cleared successfully via " + path, "color: #34d399; font-weight: bold;", data);
+                sessionStorage.clear();
+                console.log("%c🔄 Session storage cleared. Reloading page...", "color: #38bdf8;");
+                window.location.reload(); 
+                success = true;
+                break;
+            }
+        } catch (_) {}
+    }
+
+    if (!success) {
+        console.error("❌ Reset failed on all endpoints. Verify key or route configuration.");
     }
 };
 

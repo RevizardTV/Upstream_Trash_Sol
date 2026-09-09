@@ -57,39 +57,7 @@ async def serve_payment():
 
 
 
-@app.post("/api/auth/request-otp")
-async def request_otp(data: OTPRequest, request: Request):
-    client_ip = request.headers.get("x-forwarded-for")
-    if client_ip:
-        client_ip = client_ip.split(",")[0].strip()
-    else:
-        client_ip = request.client.host if request.client else "127.0.0.1"
-    
-    # Generate OTP and store in Redis
-    otp, error = await login.generate_otp(data.email_address, client_ip)
-    
-    if error or not otp:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, 
-            detail=error or "Failed to generate OTP code."
-        )
-        
-    print(f"OTP:{otp}, ERROR:{error},2.REDIS CLIENT CHECK:{redis_client},REDIS_URL:{redis_url}")
-    
-    if error:
-        raise HTTPException(status_code=429, detail=error)
-        
-    # Dispatch Email via Resend integration
-    try:
-        await send_email(
-            to_email=data.email_address,
-            subject="EcoRecycle - Your Login OTP",
-            body=otp  # Pass the raw OTP code so the template formats it correctly
-        )
-        return {"status": "success", "message": "OTP code dispatched successfully"}
-    except Exception as e:
-        print(f"Email delivery error context: {e}")
-        raise HTTPException(status_code=500, detail="OTP generated, but email delivery failed.")
+
     
 @app.get("/api/auth/redis-inspect")
 async def redis_inspect(x_secret_key: str = Header(...)):
@@ -146,3 +114,46 @@ async def redis_inspect(x_secret_key: str = Header(...)):
     except Exception as e:
         print(f"CRITICAL REDIS INSPECT ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+from resend.exceptions import ResendError
+
+# Emergency Reset Endpoints (Supports both endpoint paths)
+@app.post("/emergency-reset")
+@app.post("/api/auth/emergency-reset")
+async def emergency_reset(x_secret_key: str = Header(...)):
+    if x_secret_key != config.EM_RESET_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    await redis_client.flushall()
+    return {"status": "success", "message": "Database cleared successfully"}
+
+# Request OTP with detailed Resend error reporting
+@app.post("/api/auth/request-otp")
+async def request_otp(data: OTPRequest, request: Request):
+    client_ip = request.headers.get("x-forwarded-for")
+    if client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "127.0.0.1"
+    
+    otp, error = await login.generate_otp(data.email_address, client_ip)
+    
+    if error or not otp:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=error or "Failed to generate OTP")
+        
+    try:
+        await send_email(
+            to_email=data.email_address,
+            subject="EcoRecycle - Your Verification Code",
+            body=otp
+        )
+        return {"status": "success", "message": "OTP code dispatched successfully"}
+    except ResendError as re_err:
+        print(f"CRITICAL RESEND API ERROR: {re_err}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Email dispatch failed: Check RESEND_API_KEY or verified sender domain. ({str(re_err)})"
+        )
+    except Exception as e:
+        print(f"Unexpected Email Error: {e}")
+        raise HTTPException(status_code=500, detail="OTP generated, but email delivery failed.")
