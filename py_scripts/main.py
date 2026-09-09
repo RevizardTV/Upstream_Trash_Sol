@@ -213,3 +213,16 @@ async def emergency_reset(x_secret_key: str = Header(...)):
     
     await redis_client.flushall()
     return {"status": "success", "message": "Database cleared successfully"}
+
+# Page Route Handlers
+@app.get("/register-payment")
+async def serve_register_payment():
+    return FileResponse("webpages/register_payment.html")
+
+@app.get("/pending-payments")
+async def serve_pending_payments():
+    return FileResponse("webpages/pending_payments.html")
+
+@app.get("/payment-info")
+async def serve_payment_info():
+    return FileResponse("webpages/payment_info.html")

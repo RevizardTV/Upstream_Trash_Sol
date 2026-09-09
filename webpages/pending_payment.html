@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoRecycle - Pending Queue</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap'); body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex">
+    <!-- Sidebar -->
+    <aside class="w-72 bg-slate-800/50 border-r border-slate-700/60 p-6 flex flex-col justify-between hidden md:flex">
+        <div>
+            <div class="flex items-center gap-3 mb-10 px-2">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-xl"><i class="fa-solid fa-leaf"></i></div>
+                <span class="font-bold text-lg text-white">EcoRecycle</span>
+            </div>
+            <nav class="space-y-2">
+                <a href="/payment" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 transition text-sm font-medium"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+                <a href="/register-payment" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 transition text-sm font-medium"><i class="fa-solid fa-circle-plus"></i> Register Payment</a>
+                <a href="/pending-payments" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 font-medium text-sm border border-emerald-500/20"><i class="fa-solid fa-clock-rotate-left"></i> Pending Queue</a>
+                <a href="/payment-info" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 transition text-sm font-medium"><i class="fa-solid fa-circle-info"></i> PAYT Info Guide</a>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="flex-1 p-6 md:p-10 overflow-y-auto">
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-white">Pending Transaction Queue</h1>
+                <p class="text-slate-400 text-sm mt-1">Date-ordered verification stream for submitted waste drop-offs.</p>
+            </div>
+            <span class="bg-amber-500/10 border border-amber-500/30 text-amber-400 px-3 py-1 rounded-full text-xs font-semibold">2 Active Verifications</span>
+        </header>
+
+        <!-- Queue Table Container -->
+        <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl overflow-hidden shadow-lg">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-800 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700/80">
+                            <th class="p-4">Timestamp</th>
+                            <th class="p-4">Transaction ID</th>
+                            <th class="p-4">Category & Weight</th>
+                            <th class="p-4">Est. Amount</th>
+                            <th class="p-4">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50 text-sm">
+                        <tr class="hover:bg-slate-800/40">
+                            <td class="p-4 text-slate-300 font-mono text-xs">2026-09-09 13:42</td>
+                            <td class="p-4 text-emerald-400 font-mono font-medium">#TXN-90214</td>
+                            <td class="p-4">PET Plastic (12.4 kg)</td>
+                            <td class="p-4 font-bold text-white">$4.34</td>
+                            <td class="p-4"><span class="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full">Weight Auditing</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-800/40">
+                            <td class="p-4 text-slate-300 font-mono text-xs">2026-09-08 17:15</td>
+                            <td class="p-4 text-emerald-400 font-mono font-medium">#TXN-88410</td>
+                            <td class="p-4">Aluminum Cans (8.1 kg)</td>
+                            <td class="p-4 font-bold text-white">$6.48</td>
+                            <td class="p-4"><span class="bg-sky-500/10 text-sky-400 border border-sky-500/30 text-xs px-2.5 py-1 rounded-full">Bank Transfer Initiated</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

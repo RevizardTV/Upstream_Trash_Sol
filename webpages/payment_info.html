@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoRecycle - Payment Info</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap'); body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex">
+    <!-- Sidebar -->
+    <aside class="w-72 bg-slate-800/50 border-r border-slate-700/60 p-6 flex flex-col justify-between hidden md:flex">
+        <div>
+            <div class="flex items-center gap-3 mb-10 px-2">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-xl"><i class="fa-solid fa-leaf"></i></div>
+                <span class="font-bold text-lg text-white">EcoRecycle</span>
+            </div>
+            <nav class="space-y-2">
+                <a href="/payment" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 transition text-sm font-medium"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+                <a href="/register-payment" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 transition text-sm font-medium"><i class="fa-solid fa-circle-plus"></i> Register Payment</a>
+                <a href="/pending-payments" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 transition text-sm font-medium"><i class="fa-solid fa-clock-rotate-left"></i> Pending Queue</a>
+                <a href="/payment-info" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 font-medium text-sm border border-emerald-500/20"><i class="fa-solid fa-circle-info"></i> PAYT Info Guide</a>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="flex-1 p-6 md:p-10 overflow-y-auto max-w-5xl">
+        <header class="mb-8">
+            <h1 class="text-2xl md:text-3xl font-bold text-white">Pay-As-You-Throw (PAYT) Information</h1>
+            <p class="text-slate-400 text-sm mt-1">Understanding our weight-based recycling incentivization model and rate structure.</p>
+        </header>
+
+        <!-- Process Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="bg-slate-800/40 border border-slate-700/60 p-5 rounded-2xl">
+                <div class="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center font-bold mb-3">1</div>
+                <h3 class="font-bold text-white mb-1">Separate & Tag</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">Segregate recyclables by material type into designated smart bin bags with QR codes.</p>
+            </div>
+            <div class="bg-slate-800/40 border border-slate-700/60 p-5 rounded-2xl">
+                <div class="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center font-bold mb-3">2</div>
+                <h3 class="font-bold text-white mb-1">Automated Weighing</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">Drop off at any station scale. Sensors deduct container tare weight automatically.</p>
+            </div>
+            <div class="bg-slate-800/40 border border-slate-700/60 p-5 rounded-2xl">
+                <div class="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center font-bold mb-3">3</div>
+                <h3 class="font-bold text-white mb-1">Instant Payouts</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">Receive payouts directly via UPI or Bank IMPS within 2 hours of verification.</p>
+            </div>
+        </div>
+
+        <!-- Material Rate Chart -->
+        <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-6">
+            <h3 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-tags text-emerald-400 mr-2"></i> Current Recycling Payout Rates</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50">
+                    <p class="text-xs text-slate-400">High-Density PET</p>
+                    <p class="text-lg font-bold text-emerald-400 mt-1">$0.35 / kg</p>
+                </div>
+                <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50">
+                    <p class="text-xs text-slate-400">Metals & Aluminum</p>
+                    <p class="text-lg font-bold text-emerald-400 mt-1">$0.80 / kg</p>
+                </div>
+                <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50">
+                    <p class="text-xs text-slate-400">Cardboard & Paper</p>
+                    <p class="text-lg font-bold text-emerald-400 mt-1">$0.15 / kg</p>
+                </div>
+                <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50">
+                    <p class="text-xs text-slate-400">Batteries & E-Waste</p>
+                    <p class="text-lg font-bold text-emerald-400 mt-1">$1.50 / kg</p>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

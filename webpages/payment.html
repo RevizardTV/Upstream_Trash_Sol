@@ -109,52 +109,53 @@
         </section>
 
         <!-- Primary Payment Options Grid -->
-        <h2 class="text-lg font-semibold text-slate-200 mb-4">Payment Options</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-            <!-- Card 1: Register Payment -->
-            <div class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-emerald-500/10 cursor-pointer flex flex-col justify-between">
-                <div>
-                    <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-plus-circle"></i>
+                <!-- Card 1: Register Payment -->
+                <a href="/register-payment" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between">
+                    <div>
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-plus-circle"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Register Payment</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Add a new bank account, UPI ID, or digital wallet to receive payouts for recycled materials.</p>
                     </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Register Payment</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Add a new bank account, UPI ID, or digital wallet to receive payouts for recycled materials.</p>
-                </div>
-                <div class="mt-6 flex items-center gap-2 text-emerald-400 font-semibold text-sm">
-                    <span>Configure Method</span>
-                    <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
-                </div>
-            </div>
+                    <div class="mt-6 flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+                        <span>Configure Method</span>
+                        <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </a>
 
-            <!-- Card 2: Pending Payments -->
-            <div class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-amber-500/10 cursor-pointer flex flex-col justify-between">
-                <div>
-                    <div class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-hourglass-half"></i>
+                <!-- Card 2: Pending Payments -->
+                <a href="/pending-payments" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-amber-500/10 flex flex-col justify-between">
+                    <div>
+                        <div class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Pending Payments</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Review incoming transfers, pending verification approvals, and active transaction statuses.</p>
                     </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Pending Payments</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Review incoming transfers, pending verification approvals, and active transaction statuses.</p>
-                </div>
-                <div class="mt-6 flex items-center gap-2 text-amber-400 font-semibold text-sm">
-                    <span>View 2 Pending</span>
-                    <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
-                </div>
-            </div>
+                    <div class="mt-6 flex items-center gap-2 text-amber-400 font-semibold text-sm">
+                        <span>View 2 Pending</span>
+                        <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </a>
 
-            <!-- Card 3: Info -->
-            <div class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-sky-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-sky-500/10 cursor-pointer flex flex-col justify-between">
-                <div>
-                    <div class="w-12 h-12 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-circle-info"></i>
+                <!-- Card 3: Info -->
+                <a href="/payment-info" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-sky-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-sky-500/10 flex flex-col justify-between">
+                    <div>
+                        <div class="w-12 h-12 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-circle-info"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Payment Info</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Access fee schedules, payout processing timelines, and recycling credit conversions.</p>
                     </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Payment Info</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Access fee schedules, payout processing timelines, and recycling credit conversions.</p>
-                </div>
-                <div class="mt-6 flex items-center gap-2 text-sky-400 font-semibold text-sm">
-                    <span>Read Guidelines</span>
-                    <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
-                </div>
+                    <div class="mt-6 flex items-center gap-2 text-sky-400 font-semibold text-sm">
+                        <span>Read Guidelines</span>
+                        <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </a>
+
             </div>
 
         </div>
