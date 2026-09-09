@@ -12,7 +12,7 @@ from resend.exceptions import ResendError
 
 # Database Imports
 from sqlalchemy.orm import Session
-from py_scripts.database import Base, UserProfile, engine, get_db
+from py_scripts.database import Base, UserProfile, RecyclingEntry, engine, get_db
 
 from py_scripts.config import config
 from py_scripts.emailSend import send_email
@@ -59,7 +59,7 @@ for folder in ["static", "image_assets", "webpages"]:
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# Pydantic Schemas
+# Pydantic Validation Schemas
 class OTPRequest(BaseModel):
     email_address: EmailStr
 
@@ -67,6 +67,21 @@ class OTPVerify(BaseModel):
     email_address: EmailStr
     otp_code: str
 
+class ProfileCreateSchema(BaseModel):
+    email: EmailStr
+    full_name: str
+    phone_number: str
+    city: str
+    postal_code: str
+    premise_type: str = "house"
+    household_size: int = 1
+    upi_id: str | None = None
+
+class RecyclingEntrySchema(BaseModel):
+    user_id: int
+    waste_category: str
+    weight_kg: float
+    payout_amount: float
 
 
 # Page Route Handlers
@@ -99,7 +114,7 @@ async def serve_profile_registration():
     return FileResponse("webpages/register_profile.html")
 
 
-# Authentication Endpoints
+# Authentication & Profile Endpoints
 @app.post("/api/auth/request-otp")
 async def request_otp(data: OTPRequest, request: Request):
     client_ip = request.headers.get("x-forwarded-for")
@@ -171,47 +186,42 @@ async def verify_otp_route(data: OTPVerify):
         )
 
 @app.post("/api/auth/complete-profile")
-async def complete_profile(data: ProfileCreateSchema, db: Session = Depends(get_db)):
-    user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
-    
-    if not user:
-        user = UserProfile(**data.model_dump())
-        db.add(user)
-    else:
-        for key, value in data.model_dump().items():
-            setattr(user, key, value)
-            
-    db.commit()
-    db.refresh(user)
-    return {"status": "success", "message": "Profile saved successfully!"}
-
-class ProfileCreateSchema(BaseModel):
-    email: EmailStr
-    full_name: str
-    phone_number: str
-    city: str
-    postal_code: str
-    premise_type: str = "house"
-    household_size: int = 1
-    upi_id: str | None = None
-
-@app.post("/api/auth/complete-profile")
 async def save_user_profile(data: ProfileCreateSchema, db: Session = Depends(get_db)):
-    # 1. Query for existing record by unique email
+    print("PROFILE COMPLETION ENACTED")
     user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
     
     if not user:
-        # 2. Insert new record
         user = UserProfile(**data.model_dump())
         db.add(user)
     else:
-        # 3. Update existing profile fields
         for field, value in data.model_dump().items():
             setattr(user, field, value)
             
     db.commit()
     db.refresh(user)
+    print("PROFILE DATABASE INSERTION")
     return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
+
+
+# Recycling Insertion Endpoint
+@app.post("/api/recycling/entry")
+async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(get_db)):
+    # Verify user profile exists first
+    user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User profile not found")
+        
+    new_entry = RecyclingEntry(**data.model_dump())
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    
+    return {
+        "status": "success", 
+        "message": "Recycling transaction recorded!", 
+        "entry_id": new_entry.entry_id
+    }
+
 
 # Admin & Inspection Utilities
 @app.get("/api/auth/redis-inspect")

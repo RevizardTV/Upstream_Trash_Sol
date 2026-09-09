@@ -18,6 +18,8 @@
             </div>
         </div>
 
+        <div id="statusAlert" class="hidden mb-4 p-3 rounded-xl text-xs text-center border"></div>
+
         <form id="profileRegisterForm" class="space-y-4">
             <!-- Email Address (Linked to OTP) -->
             <div>
@@ -74,13 +76,12 @@
                 <input type="text" id="upiId" placeholder="alex@okicici" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
             </div>
 
-            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl transition mt-4 text-sm flex items-center justify-center gap-2">
+            <button type="submit" id="submitBtn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl transition mt-4 text-sm flex items-center justify-center gap-2">
                 <i class="fa-solid fa-check"></i> Save & Continue to Dashboard
             </button>
         </form>
     </div>
 
-    <!-- Auto-fill Email Script -->
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const urlParams = new URLSearchParams(window.location.search);
@@ -88,6 +89,61 @@
             if (savedEmail) {
                 document.getElementById("email").value = savedEmail;
             }
+
+            const form = document.getElementById("profileRegisterForm");
+            const alertBox = document.getElementById("statusAlert");
+            const submitBtn = document.getElementById("submitBtn");
+
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                
+                submitBtn.disabled = true;
+                submitBtn.innerText = "Saving Profile...";
+
+                const profileData = {
+                    email: document.getElementById("email").value,
+                    full_name: document.getElementById("fullName").value,
+                    phone_number: document.getElementById("phoneNumber").value,
+                    city: document.getElementById("city").value,
+                    postal_code: document.getElementById("postalCode").value,
+                    premise_type: document.getElementById("premiseType").value,
+                    household_size: parseInt(document.getElementById("householdSize").value, 10),
+                    upi_id: document.getElementById("upiId").value || null
+                };
+
+                try {
+                    const response = await fetch("/api/auth/complete-profile", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(profileData)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        alertBox.className = "mb-4 p-3 rounded-xl text-xs text-center border bg-emerald-500/20 border-emerald-500 text-emerald-300";
+                        alertBox.innerText = result.message;
+                        alertBox.classList.remove("hidden");
+                        
+                        // Store created user ID locally for future transactions
+                        if (result.user_id) {
+                            localStorage.setItem("user_id", result.user_id);
+                        }
+
+                        setTimeout(() => {
+                            window.location.href = "/payment";
+                        }, 1500);
+                    } else {
+                        throw new Error(result.detail || "Failed to save profile.");
+                    }
+                } catch (err) {
+                    alertBox.className = "mb-4 p-3 rounded-xl text-xs text-center border bg-red-500/20 border-red-500 text-red-300";
+                    alertBox.innerText = err.message;
+                    alertBox.classList.remove("hidden");
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Save & Continue to Dashboard";
+                }
+            });
         });
     </script>
 </body>
