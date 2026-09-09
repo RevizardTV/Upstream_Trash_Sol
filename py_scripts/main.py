@@ -5,13 +5,15 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
-# Mount the static directory to serve /css and /js
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Ensure required static directories exist before mounting
+for folder in ["static", "image_assets", "webpages"]:
+    os.makedirs(folder, exist_ok=True)
 
-# Mount image_assets directory for SVGs or photos if needed
+# Mount static asset folders
+app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/image_assets", StaticFiles(directory="image_assets"), name="image_assets")
 
-# Serve individual page views from /webpages/
+# Page routes
 @app.get("/")
 async def serve_home():
     return FileResponse("webpages/index.html")
