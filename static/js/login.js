@@ -85,16 +85,17 @@ async function handleVerifyOTP(event) {
     
     try {
         const response = await apiPost('/verify-otp', { email_address: state.email, otp_code: code });
+        // Inside handleVerifyOTP in login_3.js
         if (response.status === "success" || response.success) {
             if (otpIntervalId) clearInterval(otpIntervalId);
+    
             sessionStorage.removeItem('pending_email');
             sessionStorage.removeItem('login_step');
-            
-            // Set session authorization flag
             sessionStorage.setItem('auth', 'true');
-            // Redirect to the Payment Dashboard View
-            window.location.href = "/payment";
-        }
+    
+    // Redirect to your recycling main page
+            window.location.href = "/payment"; 
+            }
     } catch (err) {
         if (errorDisplay) errorDisplay.textContent = err.message;
         if (err.message.includes("locked")) {
