@@ -1,7 +1,7 @@
 # emailSend.py
 import resend
 from resend.exceptions import ResendError
-from config import config
+from py_scripts.config import config
 
 def get_email_template(otp_code: str):
     return f"""
