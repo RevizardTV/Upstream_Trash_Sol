@@ -37,26 +37,25 @@ nav {
   font-weight: 700;
   font-size: 1.25rem;
   color: var(--primary);
+  text-decoration: none;
 }
 
-.nav-links button {
-  background: transparent;
-  border: none;
+.nav-links a {
   color: var(--text-muted);
   font-weight: 600;
   margin-left: 1rem;
-  cursor: pointer;
+  text-decoration: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
 }
 
-.nav-links button:hover, 
-.nav-links button.active {
+.nav-links a:hover, 
+.nav-links a.active {
   color: var(--primary);
   background: #f1f5f9;
 }
 
-/* Views Layout */
+/* Page Layout */
 main {
   flex: 1;
   display: flex;
@@ -65,22 +64,14 @@ main {
   padding: 2rem;
 }
 
-.view {
-  display: none;
-  width: 100%;
-  max-width: 500px;
-}
-
-.view.active {
-  display: block;
-}
-
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  max-width: 500px;
 }
 
 h1, h2 {
@@ -93,7 +84,7 @@ p.subtitle {
   font-size: 0.95rem;
 }
 
-/* Forms & Inputs */
+/* Form Styles */
 .form-group {
   margin-bottom: 1.25rem;
 }
@@ -119,6 +110,7 @@ input:focus, select:focus {
 }
 
 .btn {
+  display: block;
   width: 100%;
   background: var(--primary);
   color: white;
@@ -128,13 +120,15 @@ input:focus, select:focus {
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
+  text-align: center;
+  text-decoration: none;
 }
 
 .btn:hover {
   background: var(--primary-hover);
 }
 
-/* Receipt / Payment Styling */
+/* Receipt Display */
 .receipt-details {
   background: #f8fafc;
   border: 1px dashed var(--border);
