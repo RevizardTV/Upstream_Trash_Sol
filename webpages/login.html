@@ -4,22 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EcoRecycle - Login</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <link href="/static/css/styles.css" rel="stylesheet">
 </head>
 <body>
-    <main>
-        <div class="card">
+    <div id="appContainer" class="card">
+        <header class="login-header">
             <h2>PORTAL LOGIN</h2>
-            <p class="subtitle">Enter your email to receive an access code.</p>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="email">Email Address</label>
-                    <input type="email" id="email" placeholder="example@gmail.com" required />
-                </div>
-                <button type="submit" class="btn">Send OTP</button>
-            </form>
-        </div>
-    </main>
+            <p class="subtitle">Enter your email to receive a dynamic access code.</p>
+        </header>
+
+        <!-- View 1: Email Form with Built-in HTML Pattern Validation -->
+        <form id="emailForm" class="view active" onsubmit="handleSendOTP(event)">
+            <div class="form-group">
+                <label for="emailInput">Email Address</label>
+                <input
+                    type="email"
+                    id="emailInput"
+                    required
+                    placeholder="example@gmail.com"
+                    title="Please enter a valid email address"
+                    pattern="^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+                />
+            </div>
+            <button type="submit" class="btn">Send OTP</button>
+        </form>
+
+        <!-- View 2: OTP Verification Form -->
+        <form id="otpForm" class="view" style="display: none;" onsubmit="handleVerifyOTP(event)">
+            <div class="form-group">
+                <label for="otpInput">Enter 6-Digit Code</label>
+                <input
+                    id="otpInput"
+                    required
+                    maxlength="6"
+                    pattern="\d{6}"
+                    placeholder="000000"
+                    class="otp-field"
+                />
+            </div>
+            
+            <div class="timer-container">
+                <p id="otpTimer"></p>
+            </div>
+            
+            <button type="submit" class="btn">Verify & Login</button>
+            
+            <div id="errorMessage" class="error-container" style="color: #ef4444; margin-top: 1rem;">
+                <p></p>
+            </div>
+        </form>
+    </div>
 
     <script src="/static/js/login.js"></script>
 </body>
