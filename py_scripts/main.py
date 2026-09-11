@@ -2,7 +2,7 @@ import json
 import os
 import sys
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -169,8 +169,7 @@ async def verify_otp_route(data: OTPVerify):
         response.set_cookie(
             key="session_authenticated",
             value="true",
-            httponly=True,
-            secure=True,
+            httponly=False,
             samesite="lax",
             path="/"
         )
@@ -186,7 +185,7 @@ async def verify_otp_route(data: OTPVerify):
         )
 
 @app.post("/api/auth/complete-profile")
-async def save_user_profile(data: ProfileCreateSchema, db: Session = Depends(get_db)):
+async def save_user_profile(data: ProfileCreateSchema, response: Response, db: Session = Depends(get_db)):
     print("PROFILE COMPLETION ENACTED")
     user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
     
@@ -200,13 +199,21 @@ async def save_user_profile(data: ProfileCreateSchema, db: Session = Depends(get
     db.commit()
     db.refresh(user)
     print("PROFILE DATABASE INSERTION")
+
+    # Set authentication cookie explicitly upon profile completion
+    response.set_cookie(
+        key="session_authenticated",
+        value="true",
+        httponly=False,
+        samesite="lax",
+        path="/"
+    )
     return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
 
 
 # Recycling Insertion Endpoint
 @app.post("/api/recycling/entry")
 async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(get_db)):
-    # Verify user profile exists first
     user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
@@ -288,11 +295,9 @@ async def emergency_reset(x_secret_key: str = Header(...)):
     await redis_client.flushall()
     return {"status": "success", "message": "Database cleared successfully"}
 
-# --- Added Database Admin/Inspection Endpoints ---
 
 @app.post("/api/admin/wipe-database")
 async def wipe_database(db: Session = Depends(get_db)):
-    """Wipes all rows from user_profiles and recycling_entries without dropping tables."""
     try:
         db.query(RecyclingEntry).delete()
         db.query(UserProfile).delete()
@@ -304,7 +309,6 @@ async def wipe_database(db: Session = Depends(get_db)):
 
 @app.get("/api/admin/show-profiles")
 async def show_profiles(db: Session = Depends(get_db)):
-    """Returns a list of all user profiles in the database."""
     profiles = db.query(UserProfile).all()
     return {
         "status": "success",
@@ -328,7 +332,6 @@ async def show_profiles(db: Session = Depends(get_db)):
 
 @app.get("/api/admin/show-data")
 async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
-    """Returns all rows from the specified table ('Profile' / 'user_profiles' or 'Trash' / 'recycling_entries')."""
     table_lower = table.lower()
     
     if table_lower in ["profile", "profiles", "user_profiles"]:

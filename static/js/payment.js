@@ -1,15 +1,15 @@
 document.addEventListener("DOMContentLoaded", async () => {
-    // 1. Check Session Authentication
-    const isAuthenticated = document.cookie.includes("session_authenticated=true");
-    if (!isAuthenticated) {
+    // 1. Check Session Authentication (Cookie or Storage Fallback)
+    const hasCookie = document.cookie.includes("session_authenticated=true");
+    const verifiedEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
+    const userId = localStorage.getItem("user_id");
+
+    if (!hasCookie && !verifiedEmail && !userId) {
         window.location.href = "/login";
         return;
     }
 
     // 2. Fetch User Profile Data
-    const userId = localStorage.getItem("user_id");
-    const verifiedEmail = sessionStorage.getItem("verified_email");
-
     if (userId || verifiedEmail) {
         try {
             const param = userId ? `user_id=${userId}` : `email=${encodeURIComponent(verifiedEmail)}`;

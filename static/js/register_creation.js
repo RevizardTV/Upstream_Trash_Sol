@@ -87,10 +87,8 @@ async function handleProfileSubmit(event) {
     submitBtn.innerText = "Dispatching OTP...";
 
     try {
-        // Step A: Request OTP to target email
         await apiPost('/request-otp', { email_address: payload.email });
         
-        // Step B: Cache profile info in session state until verified
         regState.profileData = payload;
         regState.step = 'otp';
         ViewManager.render();
@@ -126,13 +124,15 @@ async function handleVerifyAndSaveProfile(event) {
             otp_code: code 
         });
 
-        // Step B: Save profile data
+        // Step B: Complete profile and get user_id
         const result = await apiPost('/complete-profile', cachedData);
 
         if (otpIntervalId) clearInterval(otpIntervalId);
 
-        // Save session credentials for payment.js
+        // Save Auth Identifiers to both storage layers
         sessionStorage.setItem("verified_email", cachedData.email);
+        localStorage.setItem("verified_email", cachedData.email);
+        
         if (result.user_id) {
             localStorage.setItem("user_id", result.user_id);
         }
@@ -149,7 +149,7 @@ async function handleVerifyAndSaveProfile(event) {
 
         setTimeout(() => {
             window.location.href = "/payment";
-        }, 1000);
+        }, 500);
 
     } catch (err) {
         if (errorDisplay) errorDisplay.textContent = err.message;
@@ -159,7 +159,6 @@ async function handleVerifyAndSaveProfile(event) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    // Auto fill email from query params or login session if existing
     const urlParams = new URLSearchParams(window.location.search);
     const savedEmail = urlParams.get("email") || sessionStorage.getItem("verified_email");
     const emailField = document.getElementById("email");
