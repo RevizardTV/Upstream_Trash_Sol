@@ -287,3 +287,85 @@ async def emergency_reset(x_secret_key: str = Header(...)):
     
     await redis_client.flushall()
     return {"status": "success", "message": "Database cleared successfully"}
+
+# --- Added Database Admin/Inspection Endpoints ---
+
+@app.post("/api/admin/wipe-database")
+async def wipe_database(db: Session = Depends(get_db)):
+    """Wipes all rows from user_profiles and recycling_entries without dropping tables."""
+    try:
+        db.query(RecyclingEntry).delete()
+        db.query(UserProfile).delete()
+        db.commit()
+        return {"status": "success", "message": "All data in user_profiles and recycling_entries has been wiped."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to wipe database: {str(e)}")
+
+@app.get("/api/admin/show-profiles")
+async def show_profiles(db: Session = Depends(get_db)):
+    """Returns a list of all user profiles in the database."""
+    profiles = db.query(UserProfile).all()
+    return {
+        "status": "success",
+        "count": len(profiles),
+        "profiles": [
+            {
+                "id": p.id,
+                "email": p.email,
+                "full_name": p.full_name,
+                "phone_number": p.phone_number,
+                "city": p.city,
+                "postal_code": p.postal_code,
+                "premise_type": p.premise_type,
+                "household_size": p.household_size,
+                "upi_id": p.upi_id,
+                "created_at": p.created_at.isoformat() if p.created_at else None
+            }
+            for p in profiles
+        ]
+    }
+
+@app.get("/api/admin/show-data")
+async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
+    """Returns all rows from the specified table ('Profile' / 'user_profiles' or 'Trash' / 'recycling_entries')."""
+    table_lower = table.lower()
+    
+    if table_lower in ["profile", "profiles", "user_profiles"]:
+        records = db.query(UserProfile).all()
+        data = [
+            {
+                "id": p.id,
+                "email": p.email,
+                "full_name": p.full_name,
+                "phone_number": p.phone_number,
+                "city": p.city,
+                "postal_code": p.postal_code,
+                "premise_type": p.premise_type,
+                "household_size": p.household_size,
+                "upi_id": p.upi_id,
+                "created_at": p.created_at.isoformat() if p.created_at else None
+            }
+            for p in records
+        ]
+        return {"status": "success", "table": "user_profiles", "count": len(data), "data": data}
+
+    elif table_lower in ["trash", "recycling", "recycling_entries", "queued_trash"]:
+        records = db.query(RecyclingEntry).all()
+        data = [
+            {
+                "entry_id": r.entry_id,
+                "user_id": r.user_id,
+                "waste_category": r.waste_category,
+                "weight_kg": r.weight_kg,
+                "payout_amount": r.payout_amount
+            }
+            for r in records
+        ]
+        return {"status": "success", "table": "recycling_entries", "count": len(data), "data": data}
+
+    else:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unknown table parameter '{table}'. Valid options: 'Profile', 'Trash', 'user_profiles', 'recycling_entries'."
+        )
