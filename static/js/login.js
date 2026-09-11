@@ -85,26 +85,18 @@ async function handleVerifyOTP(event) {
     
     try {
         const response = await apiPost('/verify-otp', { email_address: state.email, otp_code: code });
-        // Inside handleVerifyOTP in login_3.js
+        
         if (response.status === "success" || response.success) {
             if (otpIntervalId) clearInterval(otpIntervalId);
     
+            sessionStorage.setItem("verified_email", state.email);
             sessionStorage.removeItem('pending_email');
             sessionStorage.removeItem('login_step');
-            sessionStorage.setItem('auth', 'true');
     
-    // Redirect to your recycling main page
             window.location.href = "/payment"; 
-            }
+        }
     } catch (err) {
         if (errorDisplay) errorDisplay.textContent = err.message;
-        if (err.message.includes("locked")) {
-            if (otpIntervalId) clearInterval(otpIntervalId);
-            if (otpTimer) {
-                otpTimer.textContent = "Account locked out.";
-                otpTimer.style.color = "red";
-            }
-        }
         document.getElementById('otpInput').value = '';
     }
 }

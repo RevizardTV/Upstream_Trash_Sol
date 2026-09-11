@@ -126,28 +126,30 @@ async function handleVerifyAndSaveProfile(event) {
             otp_code: code 
         });
 
-        // Step B: Enter Profile completion into database only on successful verification
+        // Step B: Save profile data
         const result = await apiPost('/complete-profile', cachedData);
 
         if (otpIntervalId) clearInterval(otpIntervalId);
 
-        // Cleanup registration session
-        sessionStorage.removeItem('temp_profile_data');
-        sessionStorage.removeItem('reg_step');
-
+        // Save session credentials for payment.js
+        sessionStorage.setItem("verified_email", cachedData.email);
         if (result.user_id) {
             localStorage.setItem("user_id", result.user_id);
         }
 
+        // Cleanup temporary registration session state
+        sessionStorage.removeItem('temp_profile_data');
+        sessionStorage.removeItem('reg_step');
+
         if (alertBox) {
             alertBox.className = "mb-4 p-3 rounded-xl text-xs text-center border bg-emerald-500/20 border-emerald-500 text-emerald-300";
-            alertBox.innerText = "Profile verified and created successfully! Redirecting...";
+            alertBox.innerText = "Profile verified and created successfully! Redirecting to payment dashboard...";
             alertBox.classList.remove("hidden");
         }
 
         setTimeout(() => {
             window.location.href = "/payment";
-        }, 1500);
+        }, 1000);
 
     } catch (err) {
         if (errorDisplay) errorDisplay.textContent = err.message;

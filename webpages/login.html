@@ -1,59 +1,87 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EcoRecycle - Login</title>
-    <link href="/static/css/styles.css" rel="stylesheet">
+    <title>EcoRecycle - Portal Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
 </head>
-<body>
-    <div id="appContainer" class="card">
-        <header class="login-header">
-            <h2>PORTAL LOGIN</h2>
-            <p class="subtitle">Enter your email to receive a dynamic access code.</p>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-6">
+
+    <main class="max-w-md w-full bg-slate-800/60 border border-slate-700/80 rounded-2xl p-8 shadow-xl">
+        <!-- Logo & Header -->
+        <header class="flex flex-col items-center text-center mb-8">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-2xl mb-3 shadow-lg shadow-emerald-500/10">
+                <i class="fa-solid fa-leaf"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-white tracking-tight">Portal Login</h1>
+            <p class="text-xs text-slate-400 mt-1">Enter your registered email to receive a dynamic access code.</p>
         </header>
 
-        <!-- View 1: Email Form with Built-in HTML Pattern Validation -->
-        <form id="emailForm" class="view active" onsubmit="handleSendOTP(event)">
-            <div class="form-group">
-                <label for="emailInput">Email Address</label>
-                <input
-                    type="email"
-                    id="emailInput"
-                    required
-                    placeholder="example@gmail.com"
-                    title="Please enter a valid email address"
-                    pattern="^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
-                />
+        <!-- Error Message Placeholder -->
+        <div id="errorMessage" class="text-rose-400 text-xs text-center mb-4 font-medium empty:hidden bg-rose-500/10 border border-rose-500/30 p-2.5 rounded-xl"></div>
+
+        <!-- View 1: Request OTP -->
+        <form id="emailForm" class="space-y-4" onsubmit="handleSendOTP(event)">
+            <div>
+                <label for="emailInput" class="block text-xs font-semibold text-slate-300 mb-1.5">Email Address</label>
+                <div class="relative">
+                    <input 
+                        type="email" 
+                        id="emailInput" 
+                        required 
+                        placeholder="example@gmail.com"
+                        pattern="^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 placeholder-slate-500"
+                    />
+                    <i class="fa-solid fa-envelope absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+                </div>
             </div>
-            <button type="submit" class="btn">Send OTP</button>
+
+            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
+                <i class="fa-solid fa-paper-plane text-xs"></i> Send Access Code
+            </button>
+            
+            <p class="text-center text-xs text-slate-500 mt-4">
+                Don't have a profile yet? <a href="/register-profile" class="text-emerald-400 hover:underline font-medium">Create One Here</a>
+            </p>
         </form>
 
-        <!-- View 2: OTP Verification Form -->
-        <form id="otpForm" class="view" style="display: none;" onsubmit="handleVerifyOTP(event)">
-            <div class="form-group">
-                <label for="otpInput">Enter 6-Digit Code</label>
-                <input
-                    id="otpInput"
-                    required
-                    maxlength="6"
-                    pattern="\d{6}"
-                    placeholder="000000"
-                    class="otp-field"
-                />
+        <!-- View 2: Verify OTP -->
+        <form id="otpForm" class="space-y-4 hidden" onsubmit="handleVerifyOTP(event)">
+            <div>
+                <label for="otpInput" class="block text-xs font-semibold text-slate-300 mb-1.5">Enter 6-Digit Code</label>
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="otpInput" 
+                        required 
+                        maxlength="6" 
+                        pattern="\d{6}" 
+                        placeholder="000000" 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-center tracking-widest font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
+                    />
+                </div>
             </div>
-            
-            <div class="timer-container">
-                <p id="otpTimer"></p>
+
+            <div class="text-center">
+                <span id="otpTimer" class="text-xs text-slate-400 font-medium"></span>
             </div>
-            
-            <button type="submit" class="btn">Verify & Login</button>
-            
-            <div id="errorMessage" class="error-container" style="color: #ef4444; margin-top: 1rem;">
-                <p></p>
-            </div>
+
+            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
+                <i class="fa-solid fa-right-to-bracket text-xs"></i> Verify & Access Portal
+            </button>
+
+            <button type="button" onclick="state.step='phone'; ViewManager.render();" class="w-full bg-transparent hover:bg-slate-700/50 text-slate-400 text-xs py-2 rounded-xl transition">
+                ← Change Email Address
+            </button>
         </form>
-    </div>
+    </main>
 
     <script src="/static/js/login.js"></script>
     <script src="/static/js/redis_check.js"></script>
