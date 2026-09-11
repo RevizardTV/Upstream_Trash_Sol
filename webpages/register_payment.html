@@ -36,28 +36,59 @@
             <!-- Material Type Selector -->
             <div>
                 <label class="block text-sm font-semibold text-slate-200 mb-3">1. Select Waste Category</label>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <label class="cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
-                        <input type="radio" name="material" value="plastic" class="sr-only" checked>
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <label class="cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 relative group">
+                        <input type="radio" name="material" value="plastic" data-rate="0.35" data-type="payout" class="sr-only" checked>
                         <i class="fa-solid fa-bottle-water text-emerald-400 text-xl"></i>
                         <span class="text-xs font-semibold">Plastic ($0.35/kg)</span>
+                        <button type="button" onclick="showTip('plastic')" class="text-slate-400 hover:text-white text-xs mt-1"><i class="fa-solid fa-circle-info"></i> Info</button>
                     </label>
-                    <label class="cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
-                        <input type="radio" name="material" value="metal" class="sr-only">
-                        <i class="fa-solid fa-can-food text-amber-400 text-xl"></i>
+
+                    <!-- Fixed Metal Icon (fa-layer-group / fa-cubes) -->
+                    <label class="cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 relative group">
+                        <input type="radio" name="material" value="metal" data-rate="0.80" data-type="payout" class="sr-only">
+                        <i class="fa-solid fa-layer-group text-amber-400 text-xl"></i>
                         <span class="text-xs font-semibold">Metal ($0.80/kg)</span>
+                        <button type="button" onclick="showTip('metal')" class="text-slate-400 hover:text-white text-xs mt-1"><i class="fa-solid fa-circle-info"></i> Info</button>
                     </label>
-                    <label class="cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
-                        <input type="radio" name="material" value="paper" class="sr-only">
+
+                    <label class="cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 relative group">
+                        <input type="radio" name="material" value="paper" data-rate="0.15" data-type="payout" class="sr-only">
                         <i class="fa-solid fa-box text-sky-400 text-xl"></i>
                         <span class="text-xs font-semibold">Paper ($0.15/kg)</span>
+                        <button type="button" onclick="showTip('paper')" class="text-slate-400 hover:text-white text-xs mt-1"><i class="fa-solid fa-circle-info"></i> Info</button>
                     </label>
-                    <label class="cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
-                        <input type="radio" name="material" value="ewaste" class="sr-only">
+
+                    <label class="cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 relative group">
+                        <input type="radio" name="material" value="ewaste" data-rate="1.50" data-type="payout" class="sr-only">
                         <i class="fa-solid fa-plug text-purple-400 text-xl"></i>
                         <span class="text-xs font-semibold">E-Waste ($1.50/kg)</span>
+                        <button type="button" onclick="showTip('ewaste')" class="text-slate-400 hover:text-white text-xs mt-1"><i class="fa-solid fa-circle-info"></i> Info</button>
+                    </label>
+
+                    <!-- Added Landfill Category -->
+                    <label class="cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-rose-500/50 bg-slate-800/40 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-500/10 relative group">
+                        <input type="radio" name="material" value="landfill" data-rate="-0.25" data-type="charge" class="sr-only">
+                        <i class="fa-solid fa-trash-can text-rose-400 text-xl"></i>
+                        <span class="text-xs font-semibold">Landfill (-$0.25/kg)</span>
+                        <button type="button" onclick="showTip('landfill')" class="text-slate-400 hover:text-white text-xs mt-1"><i class="fa-solid fa-circle-info"></i> Info</button>
                     </label>
                 </div>
+            </div>
+
+            <!-- Estimated Output Box -->
+            <div class="bg-slate-900 border border-slate-700 p-4 rounded-xl flex justify-between items-center">
+                <span class="text-sm font-semibold text-slate-300">Estimated Total:</span>
+                <span id="estimatedTotal" class="text-lg font-bold text-emerald-400">$0.00 (Payout)</span>
+            </div>
+
+            <!-- Category Info Tip Modal / Banner -->
+            <div id="infoPanel" class="hidden bg-slate-800 border border-emerald-500/40 p-4 rounded-xl text-xs text-slate-300">
+                <div class="flex justify-between font-bold text-white mb-1">
+                    <span id="infoTitle">Optimization Tip</span>
+                    <button type="button" onclick="document.getElementById('infoPanel').classList.add('hidden')">✕</button>
+                </div>
+                <p id="infoContent"></p>
             </div>
 
             <!-- Weight and Station -->
