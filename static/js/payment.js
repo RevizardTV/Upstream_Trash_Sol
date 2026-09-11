@@ -1,19 +1,40 @@
-document.addEventListener("DOMContentLoaded", () => {
-    // 1. Session Auth Check
+document.addEventListener("DOMContentLoaded", async () => {
+    // 1. Check Session Authentication
     const isAuthenticated = document.cookie.includes("session_authenticated=true");
     if (!isAuthenticated) {
         window.location.href = "/login";
         return;
     }
 
-    // 2. Programmatic Navigation Handlers (Optional parameter passing)
-    window.navigateToRegister = (defaultCategory = '') => {
-        const url = defaultCategory ? `/register-payment?category=${defaultCategory}` : '/register-payment';
-        window.location.href = url;
-    };
+    // 2. Fetch User Profile Data
+    const userId = localStorage.getItem("user_id");
+    const verifiedEmail = sessionStorage.getItem("verified_email");
 
-    window.navigateToPending = (filterStatus = '') => {
-        const url = filterStatus ? `/pending-payments?status=${filterStatus}` : '/pending-payments';
-        window.location.href = url;
-    };
+    if (userId || verifiedEmail) {
+        try {
+            const param = userId ? `user_id=${userId}` : `email=${encodeURIComponent(verifiedEmail)}`;
+            const response = await fetch(`/api/user/profile?${param}`);
+            const result = await response.json();
+
+            if (response.ok && result.profile) {
+                document.getElementById("profileName").textContent = result.profile.full_name;
+                document.getElementById("profileEmail").textContent = result.profile.email;
+            } else {
+                fallbackProfileInfo(verifiedEmail);
+            }
+        } catch (err) {
+            console.error("Failed to load user profile:", err);
+            fallbackProfileInfo(verifiedEmail);
+        }
+    } else {
+        fallbackProfileInfo(null);
+    }
 });
+
+function fallbackProfileInfo(email) {
+    const nameEl = document.getElementById("profileName");
+    const emailEl = document.getElementById("profileEmail");
+    
+    if (nameEl) nameEl.textContent = "Eco User";
+    if (emailEl) emailEl.textContent = email || "user@ecorecycle.com";
+}

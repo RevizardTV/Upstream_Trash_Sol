@@ -369,3 +369,32 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
             status_code=400, 
             detail=f"Unknown table parameter '{table}'. Valid options: 'Profile', 'Trash', 'user_profiles', 'recycling_entries'."
         )
+        
+@app.get("/api/user/profile")
+async def get_user_profile(user_id: int = Query(None), email: str = Query(None), db: Session = Depends(get_db)):
+    if not user_id and not email:
+        raise HTTPException(status_code=400, detail="Must provide user_id or email query parameter")
+    
+    query = db.query(UserProfile)
+    if user_id:
+        user = query.filter(UserProfile.id == user_id).first()
+    else:
+        user = query.filter(UserProfile.email == email).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    return {
+        "status": "success",
+        "profile": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "phone_number": user.phone_number,
+            "city": user.city,
+            "postal_code": user.postal_code,
+            "premise_type": user.premise_type,
+            "household_size": user.household_size,
+            "upi_id": user.upi_id
+        }
+    }
