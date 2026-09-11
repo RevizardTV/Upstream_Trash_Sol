@@ -41,7 +41,6 @@ class UserProfile(Base):
     recycling_entries: Mapped[List["RecyclingEntry"]] = relationship("RecyclingEntry", back_populates="user", cascade="all, delete-orphan")
 
 
-# Updated database.py model snippet
 class RecyclingEntry(Base):
     __tablename__ = "recycling_entries"
 
@@ -49,8 +48,11 @@ class RecyclingEntry(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("user_profiles.id"))
     waste_category: Mapped[str] = mapped_column(String(50))
     weight_kg: Mapped[float]
-    payout_amount: Mapped[float] # Can store positive for payouts or negative for fees
-    entry_type: Mapped[str] = mapped_column(String(20), default="payout") # "payout" or "charge"
+    payout_amount: Mapped[float]
+    entry_type: Mapped[str] = mapped_column(String(20), default="payout")  # "payout" or "charge"
+    
+    # Relationship back to UserProfile
+    user: Mapped["UserProfile"] = relationship("UserProfile", back_populates="recycling_entries")
 
 # 5. FastAPI Database Dependency
 def get_db() -> Generator[Session, None, None]:

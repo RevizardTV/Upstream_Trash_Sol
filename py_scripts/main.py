@@ -4,7 +4,7 @@ import sys
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr
 import redis.asyncio as redis
@@ -82,6 +82,7 @@ class RecyclingEntrySchema(BaseModel):
     waste_category: str
     weight_kg: float
     payout_amount: float
+    entry_type: str = "payout"
 
 
 # Page Route Handlers
@@ -186,7 +187,6 @@ async def verify_otp_route(data: OTPVerify):
 
 @app.post("/api/auth/complete-profile")
 async def save_user_profile(data: ProfileCreateSchema, response: Response, db: Session = Depends(get_db)):
-    print("PROFILE COMPLETION ENACTED")
     user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
     
     if not user:
@@ -198,9 +198,7 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
             
     db.commit()
     db.refresh(user)
-    print("PROFILE DATABASE INSERTION")
 
-    # Set authentication cookie explicitly upon profile completion
     response.set_cookie(
         key="session_authenticated",
         value="true",
@@ -230,106 +228,7 @@ async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(
     }
 
 
-# Admin & Inspection Utilities
-@app.get("/api/auth/redis-inspect")
-async def redis_inspect(x_secret_key: str = Header(...)):
-    if x_secret_key != config.EM_RESET_KEY:
-        raise HTTPException(status_code=403, detail="Unauthorized")
-    
-    try:
-        keys = await redis_client.keys("*")
-        records = []
-        
-        for key in keys:
-            key_str = key.decode('utf-8') if isinstance(key, bytes) else str(key)
-            key_type = await redis_client.type(key)
-            value = None
-            
-            try:
-                if key_type == "string":
-                    raw_val = await redis_client.get(key)
-                    value = raw_val.decode('utf-8') if isinstance(raw_val, bytes) else str(raw_val)
-                    
-                elif key_type == "hash":
-                    hash_dict = await redis_client.hgetall(key)
-                    value = {
-                        (k.decode('utf-8') if isinstance(k, bytes) else str(k)): 
-                        (v.decode('utf-8') if isinstance(v, bytes) else str(v)) 
-                        for k, v in hash_dict.items()
-                    }
-                    
-                elif key_type == "set":
-                    set_members = await redis_client.smembers(key)
-                    value = [item.decode('utf-8') if isinstance(item, bytes) else str(item) for item in set_members]
-                    
-                elif key_type == "list":
-                    list_items = await redis_client.lrange(key, 0, -1)
-                    value = [item.decode('utf-8') if isinstance(item, bytes) else str(item) for item in list_items]
-                    
-                else:
-                    value = f"[{key_type.upper()} Data Structure]"
-
-            except Exception as parse_err:
-                value = f"[Parsing Failure: {str(parse_err)}]"
-
-            ttl = await redis_client.ttl(key)
-            
-            records.append({
-                "key": key_str,
-                "value": json.dumps(value) if isinstance(value, (dict, list)) else str(value),
-                "ttl_seconds": ttl
-            })
-            
-        return {"status": "success", "records": records}
-        
-    except Exception as e:
-        print(f"CRITICAL REDIS INSPECT ERROR: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/emergency-reset")
-@app.post("/api/auth/emergency-reset")
-async def emergency_reset(x_secret_key: str = Header(...)):
-    if x_secret_key != config.EM_RESET_KEY:
-        raise HTTPException(status_code=403, detail="Unauthorized")
-    
-    await redis_client.flushall()
-    return {"status": "success", "message": "Database cleared successfully"}
-
-
-@app.post("/api/admin/wipe-database")
-async def wipe_database(db: Session = Depends(get_db)):
-    try:
-        db.query(RecyclingEntry).delete()
-        db.query(UserProfile).delete()
-        db.commit()
-        return {"status": "success", "message": "All data in user_profiles and recycling_entries has been wiped."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to wipe database: {str(e)}")
-
-@app.get("/api/admin/show-profiles")
-async def show_profiles(db: Session = Depends(get_db)):
-    profiles = db.query(UserProfile).all()
-    return {
-        "status": "success",
-        "count": len(profiles),
-        "profiles": [
-            {
-                "id": p.id,
-                "email": p.email,
-                "full_name": p.full_name,
-                "phone_number": p.phone_number,
-                "city": p.city,
-                "postal_code": p.postal_code,
-                "premise_type": p.premise_type,
-                "household_size": p.household_size,
-                "upi_id": p.upi_id,
-                "created_at": p.created_at.isoformat() if p.created_at else None
-            }
-            for p in profiles
-        ]
-    }
-
+# Admin & Data Inspection Utilities
 @app.get("/api/admin/show-data")
 async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
     table_lower = table.lower()
@@ -361,7 +260,8 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
                 "user_id": r.user_id,
                 "waste_category": r.waste_category,
                 "weight_kg": r.weight_kg,
-                "payout_amount": r.payout_amount
+                "payout_amount": r.payout_amount,
+                "entry_type": getattr(r, "entry_type", "payout")
             }
             for r in records
         ]
@@ -370,9 +270,9 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
     else:
         raise HTTPException(
             status_code=400, 
-            detail=f"Unknown table parameter '{table}'. Valid options: 'Profile', 'Trash', 'user_profiles', 'recycling_entries'."
+            detail=f"Unknown table parameter '{table}'."
         )
-        
+
 @app.get("/api/user/profile")
 async def get_user_profile(user_id: int = Query(None), email: str = Query(None), db: Session = Depends(get_db)):
     if not user_id and not email:
