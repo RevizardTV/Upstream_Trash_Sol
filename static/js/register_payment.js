@@ -106,7 +106,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
-                const result = await response.json();
+                let result;
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    result = await response.json();
+                } else {
+                    const textError = await response.text();
+                    throw new Error(`Server returned status ${response.status}: ${textError}`);
+                }
 
                 if (response.ok) {
                     alert(`Drop-off recorded successfully! Entry ID: ${result.entry_id}`);
@@ -117,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             } catch (err) {
                 console.error("Submission Failure:", err);
-                alert("Failed to submit entry. Check console logs.");
+                alert(`Submission failed: ${err.message}`);
             }
         });
     }

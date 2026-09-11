@@ -212,20 +212,27 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
 # Recycling Insertion Endpoint
 @app.post("/api/recycling/entry")
 async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(get_db)):
-    user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User profile not found")
+    try:
+        user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User ID {data.user_id} not found in user_profiles.")
+            
+        new_entry = RecyclingEntry(**data.model_dump())
+        db.add(new_entry)
+        db.commit()
+        db.refresh(new_entry)
         
-    new_entry = RecyclingEntry(**data.model_dump())
-    db.add(new_entry)
-    db.commit()
-    db.refresh(new_entry)
-    
-    return {
-        "status": "success", 
-        "message": "Recycling transaction recorded!", 
-        "entry_id": new_entry.entry_id
-    }
+        return {
+            "status": "success", 
+            "message": "Recycling transaction recorded!", 
+            "entry_id": new_entry.entry_id
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        print(f"RECYCLING ENTRY ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database insertion failed: {str(e)}")
 
 
 # Admin & Data Inspection Utilities
