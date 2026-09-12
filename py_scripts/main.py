@@ -77,12 +77,7 @@ class ProfileCreateSchema(BaseModel):
     household_size: int = 1
     upi_id: str | None = None
 
-class RecyclingEntrySchema(BaseModel):
-    user_id: int
-    waste_category: str
-    weight_kg: float
-    payout_amount: float
-    entry_type: str = "payout"
+
 
 
 # Page Route Handlers
@@ -307,4 +302,51 @@ async def get_user_profile(user_id: int = Query(None), email: str = Query(None),
             "household_size": user.household_size,
             "upi_id": user.upi_id
         }
+    }
+
+class RecyclingEntrySchema(BaseModel):
+    user_id: int
+    waste_category: str
+    weight_kg: float
+    payout_amount: float
+
+    class Config:
+        from_attributes = True
+
+@app.get("/api/recycling/pending-payments")
+async def get_pending_payments(
+    user_id: int = Query(None), 
+    email: str = Query(None), 
+    db: Session = Depends(get_db)
+):
+    if not user_id and not email:
+        raise HTTPException(status_code=400, detail="Must provide user_id or email")
+    
+    # Resolve user_id if email was passed
+    if not user_id and email:
+        user = db.query(UserProfile).filter(UserProfile.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User profile not found")
+        user_id = user.id
+
+    # Query entries for the target user
+    entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).order_by(RecyclingEntry.entry_id.desc()).all()
+    
+    total_payout = sum(float(entry.payout_amount) for entry in entries)
+
+    return {
+        "status": "success",
+        "user_id": user_id,
+        "total_pending_amount": total_payout,
+        "count": len(entries),
+        "entries": [
+            {
+                "entry_id": entry.entry_id,
+                "waste_category": entry.waste_category,
+                "weight_kg": float(entry.weight_kg),
+                "payout_amount": float(entry.payout_amount),
+                "created_at": entry.created_at.isoformat() if entry.created_at else None
+            }
+            for entry in entries
+        ]
     }

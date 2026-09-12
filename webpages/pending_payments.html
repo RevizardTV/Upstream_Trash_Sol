@@ -27,12 +27,15 @@
 
     <!-- Content -->
     <main class="flex-1 p-6 md:p-10 overflow-y-auto">
-        <header class="flex justify-between items-center mb-8">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
             <div>
                 <h1 class="text-2xl md:text-3xl font-bold text-white">Pending Transaction Queue</h1>
-                <p class="text-slate-400 text-sm mt-1">Date-ordered verification stream for submitted waste drop-offs.</p>
+                <p class="text-slate-400 text-sm mt-1">Live record stream for submitted recycling entries.</p>
             </div>
-            <span class="bg-amber-500/10 border border-amber-500/30 text-amber-400 px-3 py-1 rounded-full text-xs font-semibold">2 Active Verifications</span>
+            <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl px-5 py-3 flex items-center gap-4 shadow-sm">
+                <span class="text-xs text-slate-400 font-medium uppercase tracking-wider">Total Pending Payout</span>
+                <span id="totalPendingAmount" class="text-xl font-bold text-emerald-400 font-mono">₹0.00</span>
+            </div>
         </header>
 
         <!-- Queue Table Container -->
@@ -41,32 +44,27 @@
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-slate-800 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700/80">
+                            <th class="p-4">Entry ID</th>
+                            <th class="p-4">Waste Category</th>
+                            <th class="p-4">Weight (kg)</th>
+                            <th class="p-4">Payout Amount</th>
                             <th class="p-4">Timestamp</th>
-                            <th class="p-4">Transaction ID</th>
-                            <th class="p-4">Category & Weight</th>
-                            <th class="p-4">Est. Amount</th>
-                            <th class="p-4">Status</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-700/50 text-sm">
-                        <tr class="hover:bg-slate-800/40">
-                            <td class="p-4 text-slate-300 font-mono text-xs">2026-09-09 13:42</td>
-                            <td class="p-4 text-emerald-400 font-mono font-medium">#TXN-90214</td>
-                            <td class="p-4">PET Plastic (12.4 kg)</td>
-                            <td class="p-4 font-bold text-white">$4.34</td>
-                            <td class="p-4"><span class="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full">Weight Auditing</span></td>
-                        </tr>
-                        <tr class="hover:bg-slate-800/40">
-                            <td class="p-4 text-slate-300 font-mono text-xs">2026-09-08 17:15</td>
-                            <td class="p-4 text-emerald-400 font-mono font-medium">#TXN-88410</td>
-                            <td class="p-4">Aluminum Cans (8.1 kg)</td>
-                            <td class="p-4 font-bold text-white">$6.48</td>
-                            <td class="p-4"><span class="bg-sky-500/10 text-sky-400 border border-sky-500/30 text-xs px-2.5 py-1 rounded-full">Bank Transfer Initiated</span></td>
+                    <tbody id="pendingPaymentsTableBody" class="divide-y divide-slate-700/50 text-sm">
+                        <!-- Loaded dynamically via pending_payments.js -->
+                        <tr>
+                            <td colspan="5" class="text-center py-6 text-slate-400">
+                                <i class="fa-solid fa-spinner fa-spin mr-2"></i> Fetching live recycling entries...
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </main>
+
+    <!-- New JS Reference -->
+    <script src="/static/js/pending_payments.js"></script>
 </body>
 </html>

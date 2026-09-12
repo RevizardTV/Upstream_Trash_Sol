@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Generator, List, Optional
-from sqlalchemy import create_engine, text, String, ForeignKey
+from sqlalchemy import create_engine, text, String, ForeignKey,Numeric,func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session, relationship
 from py_scripts.config import config
 
@@ -15,44 +16,48 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # 3. Base Declarative Class
+
+
+# 4. Database Models
+
+
+
+
+# Modern SQLAlchemy 2.0 Base class definition
 class Base(DeclarativeBase):
     pass
 
-# 4. Database Models
+
 class UserProfile(Base):
     __tablename__ = "user_profiles"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=False)
     postal_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    premise_type: Mapped[str] = mapped_column(String(50), default="house")
-    household_size: Mapped[int] = mapped_column(default=1)
-    
-    upi_id: Mapped[Optional[str]] = mapped_column(String(255), default=None)
-    profile_complete: Mapped[bool] = mapped_column(default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc)
-    )
+    premise_type: Mapped[str] = mapped_column(String(50), default="house", nullable=False)
+    household_size: Mapped[int] = mapped_column(default=1, nullable=False)
+    upi_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    # Bi-directional relationship with RecyclingEntry
-    recycling_entries: Mapped[List["RecyclingEntry"]] = relationship("RecyclingEntry", back_populates="user", cascade="all, delete-orphan")
+    # Relationship to entries
+    entries: Mapped[list["RecyclingEntry"]] = relationship("RecyclingEntry", back_populates="user", cascade="all, delete-orphan")
 
 
 class RecyclingEntry(Base):
     __tablename__ = "recycling_entries"
 
-    entry_id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("user_profiles.id"))
-    waste_category: Mapped[str] = mapped_column(String(50))
-    weight_kg: Mapped[float]
-    payout_amount: Mapped[float]
-    entry_type: Mapped[str] = mapped_column(String(20), default="payout")  # "payout" or "charge"
-    
-    # Relationship back to UserProfile
-    user: Mapped["UserProfile"] = relationship("UserProfile", back_populates="recycling_entries")
+    entry_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_profiles.id", ondelete="CASCADE"), nullable=False)
+    waste_category: Mapped[str] = mapped_column(String(100), nullable=False)
+    weight_kg: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    payout_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # Relationship back to user
+    user: Mapped["UserProfile"] = relationship("UserProfile", back_populates="entries")
 
 # 5. FastAPI Database Dependency
 def get_db() -> Generator[Session, None, None]:
