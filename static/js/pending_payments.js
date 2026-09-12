@@ -37,17 +37,18 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return;
             }
 
-            tableBody.innerHTML = result.entries.map(entry => {
+                tableBody.innerHTML = result.entries.map(entry => {
                 const formattedDate = entry.created_at 
                     ? new Date(entry.created_at).toLocaleDateString() 
                     : "N/A";
 
                 return `
-                    <tr class="border-b border-gray-700">
-                        <td class="py-3 px-4 text-capitalize">${entry.waste_category}</td>
-                        <td class="py-3 px-4">${entry.weight_kg} kg</td>
-                        <td class="py-3 px-4 text-emerald-400 font-semibold">₹${entry.payout_amount.toFixed(2)}</td>
-                        <td class="py-3 px-4 text-gray-400 text-sm">${formattedDate}</td>
+                    <tr class="border-b border-slate-700/50 hover:bg-slate-800/40">
+                        <td class="p-4 text-emerald-400 font-mono font-medium">#${entry.entry_id}</td>
+                        <td class="p-4 text-slate-300 capitalize">${entry.waste_category}</td>
+                        <td class="p-4 text-slate-300">${entry.weight_kg} kg</td>
+                        <td class="p-4 font-bold text-emerald-400">₹${entry.payout_amount.toFixed(2)}</td>
+                        <td class="p-4 text-slate-400 text-xs font-mono">${formattedDate}</td>
                     </tr>
                 `;
             }).join("");
@@ -61,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     <td colspan="4" class="text-center py-4 text-red-400">
                         Error loading entries: ${err.message}
                     </td>
-                </tr>`;
+                </tr>`;tableBody
         }
     }
 });
