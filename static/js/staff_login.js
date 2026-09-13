@@ -2,6 +2,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("staffLoginForm");
     if (!form) return;
 
+    let timerInterval = null;
+    let authSessionData = null;
+
     // Dynamically inject OTP verification container
     let otpSection = document.getElementById("staffOtpSection");
     if (!otpSection) {
@@ -13,21 +16,46 @@ document.addEventListener("DOMContentLoaded", () => {
                 <label class="block text-sm font-medium text-slate-300 mb-1">Enter 6-Digit Staff OTP</label>
                 <input type="text" id="staffOtpCode" maxlength="6" placeholder="123456" 
                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white font-mono text-center text-lg tracking-widest focus:outline-none focus:border-emerald-500">
+                <p id="staffLoginTimerText" class="text-xs text-slate-400 mt-2 font-mono text-center">Expires in 60s | Max 3 Attempts Allowed</p>
             </div>
             <button type="button" id="confirmStaffOtpBtn" 
-                    class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
+                    class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
                 Confirm OTP & Log In
             </button>
         `;
         form.appendChild(otpSection);
     }
 
-    const submitBtn = form.querySelector('button[type="submit"]');
-    if (submitBtn) submitBtn.textContent = "Send Staff OTP";
+    const submitBtn = document.getElementById("staffLoginSubmitBtn");
 
-    let authSessionData = null;
+    // Start 60-second countdown
+    function startTimer() {
+        let timeLeft = 60;
+        const timerDisplay = document.getElementById("staffLoginTimerText");
+        const verifyBtn = document.getElementById("confirmStaffOtpBtn");
 
-    // STEP 1: Validate staff password & dispatch OTP
+        verifyBtn.disabled = false;
+        timerDisplay.className = "text-xs text-slate-400 mt-2 font-mono text-center";
+
+        if (timerInterval) clearInterval(timerInterval);
+
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerDisplay.textContent = `Expires in ${timeLeft}s | Max 3 Attempts Allowed`;
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                timerDisplay.textContent = "Code expired. Please request a new OTP.";
+                timerDisplay.className = "text-xs text-rose-400 mt-2 font-mono text-center";
+                verifyBtn.disabled = true;
+                submitBtn.classList.remove("hidden");
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Resend Staff OTP";
+            }
+        }, 1000);
+    }
+
+    // STEP 1: Verify Password & Request OTP
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
@@ -58,7 +86,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // Cache staff profile details for post-OTP setup
             authSessionData = loginData;
 
             // 2. Dispatch OTP email
@@ -66,13 +93,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const otpRes = await fetch("/api/auth/request-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email_address: email })
+                body: JSON.stringify({ email_address: email, type: "staff" })
             });
 
             if (otpRes.ok) {
                 alert(`OTP code dispatched to ${email}. Check your inbox!`);
                 submitBtn.classList.add("hidden");
                 otpSection.classList.remove("hidden");
+                startTimer();
             } else {
                 const otpErr = await otpRes.json();
                 alert("Failed to send OTP: " + (otpErr.detail || "Server error"));
@@ -87,13 +115,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // STEP 2: Verify OTP and proceed to dashboard
+    // STEP 2: Confirm OTP & Authorize Session
     document.getElementById("confirmStaffOtpBtn").addEventListener("click", async () => {
         const email = document.getElementById("loginEmail").value.trim();
         const otpCode = document.getElementById("staffOtpCode").value.trim();
+        const timerDisplay = document.getElementById("staffLoginTimerText");
 
         if (otpCode.length !== 6) {
-            alert("Please enter the 6-digit verification code sent to your email.");
+            alert("Please enter the 6-digit verification code.");
             return;
         }
 
@@ -107,7 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const verifyData = await verifyRes.json();
 
             if (verifyRes.ok && authSessionData) {
-                // Save staff details to storage
+                if (timerInterval) clearInterval(timerInterval);
                 localStorage.setItem("staff_id", authSessionData.staff_id);
                 localStorage.setItem("staff_email", authSessionData.email);
                 localStorage.setItem("assigned_pincode", authSessionData.assigned_pincode);
@@ -115,7 +144,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 alert("Staff verification successful!");
                 window.location.href = "/staff-dashboard";
             } else {
-                alert("OTP verification failed: " + (verifyData.detail || "Invalid code"));
+                timerDisplay.textContent = verifyData.detail || "Invalid code.";
+                timerDisplay.className = "text-xs text-rose-400 mt-2 font-mono text-center";
             }
         } catch (err) {
             console.error("OTP verification error:", err);

@@ -2,6 +2,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("staffRegisterForm");
     if (!form) return;
 
+    let timerInterval = null;
+    let isOtpSent = false;
+
     // Dynamically inject OTP verification container
     let otpSection = document.getElementById("staffRegOtpSection");
     if (!otpSection) {
@@ -13,24 +16,49 @@ document.addEventListener("DOMContentLoaded", () => {
                 <label class="block text-sm font-medium text-slate-300 mb-1">Enter 6-Digit Staff Verification Code</label>
                 <input type="text" id="staffRegOtpCode" maxlength="6" placeholder="123456" 
                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white font-mono text-center text-lg tracking-widest focus:outline-none focus:border-emerald-500">
+                <p id="staffRegTimerText" class="text-xs text-slate-400 mt-2 font-mono text-center">Expires in 60s | Max 3 Attempts Allowed</p>
             </div>
             <button type="button" id="confirmStaffRegOtpBtn" 
-                    class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
+                    class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
                 Verify Code & Complete Registration
             </button>
         `;
         form.appendChild(otpSection);
     }
 
-    const submitBtn = form.querySelector('button[type="submit"]');
-    if (submitBtn) submitBtn.textContent = "Send Authorization Code";
+    const submitBtn = document.getElementById("submitBtn");
 
-    let isOtpSent = false;
+    // Start 60-second countdown
+    function startTimer() {
+        let timeLeft = 60;
+        const timerDisplay = document.getElementById("staffRegTimerText");
+        const verifyBtn = document.getElementById("confirmStaffRegOtpBtn");
 
-    // STEP 1: Request OTP email
+        verifyBtn.disabled = false;
+        timerDisplay.className = "text-xs text-slate-400 mt-2 font-mono text-center";
+
+        if (timerInterval) clearInterval(timerInterval);
+
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerDisplay.textContent = `Expires in ${timeLeft}s | Max 3 Attempts Allowed`;
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                timerDisplay.textContent = "Code expired. Please request a new OTP.";
+                timerDisplay.className = "text-xs text-rose-400 mt-2 font-mono text-center";
+                verifyBtn.disabled = true;
+                isOtpSent = false;
+                submitBtn.classList.remove("hidden");
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Resend Authorization Code";
+            }
+        }, 1000);
+    }
+
+    // STEP 1: Request OTP
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-
         if (isOtpSent) return;
 
         const email = document.getElementById("email").value.trim();
@@ -60,6 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 isOtpSent = true;
                 submitBtn.classList.add("hidden");
                 otpSection.classList.remove("hidden");
+                startTimer();
             } else {
                 alert("Failed to send code: " + (data.detail || "Error requesting OTP"));
                 submitBtn.disabled = false;
@@ -73,10 +102,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // STEP 2: Verify OTP and complete registration
+    // STEP 2: Verify OTP and Register Staff
     document.getElementById("confirmStaffRegOtpBtn").addEventListener("click", async () => {
         const email = document.getElementById("email").value.trim();
         const otpCode = document.getElementById("staffRegOtpCode").value.trim();
+        const timerDisplay = document.getElementById("staffRegTimerText");
 
         if (otpCode.length !== 6) {
             alert("Please enter the full 6-digit verification code.");
@@ -84,7 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         try {
-            // 1. Verify OTP code
+            // 1. Verify OTP
             const verifyRes = await fetch("/api/auth/verify-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -93,11 +123,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const verifyData = await verifyRes.json();
             if (!verifyRes.ok) {
-                alert("Verification failed: " + (verifyData.detail || "Invalid code"));
+                timerDisplay.textContent = verifyData.detail || "Invalid code.";
+                timerDisplay.className = "text-xs text-rose-400 mt-2 font-mono text-center";
                 return;
             }
 
-            // 2. Submit Staff Account Data
+            // 2. Register Staff Account
             const payload = {
                 full_name: document.getElementById("fullName").value.trim(),
                 email: email,
@@ -114,13 +145,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const regData = await regRes.json();
 
             if (regRes.ok) {
+                if (timerInterval) clearInterval(timerInterval);
                 alert("Staff account registered and verified successfully!");
                 window.location.href = "/staff-login";
             } else {
                 alert("Registration failed: " + (regData.detail || "Unknown error"));
             }
         } catch (err) {
-            console.error("Staff registration final submit error:", err);
+            console.error("Staff registration submit error:", err);
             alert("Failed to submit registration data.");
         }
     });

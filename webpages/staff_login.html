@@ -3,44 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EcoRecycle - Staff Portal Login</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>EcoRecycle - Staff Login</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♻️</text></svg>">
+    <link rel="stylesheet" href="/static/css/output.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-6">
-    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-        <div class="flex items-center gap-3 mb-8">
-            <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold text-xl">
-                <i class="fa-solid fa-lock"></i>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-8">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 mb-4">
+                <i class="fa-solid fa-lock text-2xl"></i>
             </div>
-            <div>
-                <h2 class="text-xl font-bold text-white">Staff Login</h2>
-                <p class="text-xs text-slate-400">Access District Audit Dashboard</p>
-            </div>
+            <h1 class="text-2xl font-bold text-white">Staff Portal Login</h1>
+            <p class="text-slate-400 text-sm mt-1">2-Step OTP Authentication</p>
         </div>
 
         <form id="staffLoginForm" class="space-y-4">
             <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Staff Email</label>
-                <input type="email" id="loginEmail" required placeholder="staff@ecorecycle.gov" class="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 transition">
+                <label for="loginEmail" class="block text-sm font-medium text-slate-300 mb-1">Official Email</label>
+                <input type="email" id="loginEmail" required placeholder="officer@ecorecycle.gov"
+                       class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition">
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Password</label>
-                <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 transition">
+                <label for="loginPassword" class="block text-sm font-medium text-slate-300 mb-1">Password</label>
+                <input type="password" id="loginPassword" required placeholder="••••••••"
+                       class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition">
             </div>
 
-            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 mt-6">
-                <i class="fa-solid fa-right-to-bracket"></i> Authenticate & Enter Portal
+            <button type="submit" id="staffLoginSubmitBtn"
+                    class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
+                Send Staff OTP
             </button>
         </form>
 
-        <div class="mt-6 text-center text-xs text-slate-400">
-            Need an officer account? <a href="/register-staff" class="text-amber-400 font-semibold hover:underline">Apply here</a>
+        <div class="mt-6 text-center text-sm text-slate-400">
+            Need a staff account? <a href="/register-staff" class="text-emerald-400 hover:underline">Register here</a>
         </div>
     </div>
 

@@ -2,7 +2,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("profileForm");
     if (!form) return;
 
-    // Inject OTP UI elements if not present in the HTML template
+    let otpTimerInterval = null;
+
     let otpSection = document.getElementById("otpSection");
     if (!otpSection) {
         otpSection = document.createElement("div");
@@ -13,9 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 <label class="block text-sm font-medium text-slate-300 mb-1">Enter 6-Digit OTP Code</label>
                 <input type="text" id="otpCode" maxlength="6" placeholder="123456" 
                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white font-mono text-center text-lg tracking-widest focus:outline-none focus:border-emerald-500">
+                <p id="otpTimerText" class="text-xs text-slate-400 mt-2 font-mono text-center">Expires in 60s | Max 3 Attempts Allowed</p>
             </div>
             <button type="button" id="verifyAndSubmitBtn" 
-                    class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
+                    class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
                 Verify OTP & Complete Registration
             </button>
         `;
@@ -27,17 +29,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let isOtpSent = false;
 
-    // STEP 1: Send OTP to user's email
+    // STEP 1: Request OTP
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-
         if (isOtpSent) return;
 
         const email = document.getElementById("email").value.trim();
-        if (!email) {
-            alert("Please provide a valid email address.");
-            return;
-        }
+        if (!email) return alert("Please provide a valid email address.");
 
         try {
             submitBtn.disabled = true;
@@ -56,6 +54,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 isOtpSent = true;
                 submitBtn.classList.add("hidden");
                 otpSection.classList.remove("hidden");
+
+                // Start 60s Timer
+                if (otpTimerInterval) clearInterval(otpTimerInterval);
+                otpTimerInterval = startOtpTimer("otpTimerText", "verifyAndSubmitBtn", () => {
+                    isOtpSent = false;
+                    submitBtn.classList.remove("hidden");
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Resend Verification Code";
+                });
             } else {
                 alert("OTP Request Failed: " + (data.detail || "Unable to send code."));
                 submitBtn.disabled = false;
@@ -65,22 +72,17 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("OTP generation error:", err);
             alert("Failed to communicate with authentication server.");
             submitBtn.disabled = false;
-            submitBtn.textContent = "Send Verification Code";
         }
     });
 
-    // STEP 2: Verify OTP and save profile
+    // STEP 2: Verify OTP
     document.getElementById("verifyAndSubmitBtn").addEventListener("click", async () => {
         const email = document.getElementById("email").value.trim();
         const otpCode = document.getElementById("otpCode").value.trim();
 
-        if (otpCode.length !== 6) {
-            alert("Please enter a valid 6-digit OTP code.");
-            return;
-        }
+        if (otpCode.length !== 6) return alert("Please enter a valid 6-digit OTP code.");
 
         try {
-            // 1. Verify OTP
             const verifyRes = await fetch("/api/auth/verify-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -89,11 +91,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const verifyData = await verifyRes.json();
             if (!verifyRes.ok) {
-                alert("Verification failed: " + (verifyData.detail || "Invalid code."));
+                // Update timer text with remaining attempts message returned by login.py
+                document.getElementById("otpTimerText").textContent = verifyData.detail || "Invalid code.";
+                document.getElementById("otpTimerText").className = "text-xs text-rose-400 mt-2 font-mono text-center";
                 return;
             }
 
-            // 2. Submit Profile Details
+            // Save profile details after successful OTP verification
             const profilePayload = {
                 email: email,
                 full_name: document.getElementById("fullName")?.value || "",
@@ -112,10 +116,8 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             const saveData = await saveRes.json();
-
             if (saveRes.ok) {
                 localStorage.setItem("user_id", saveData.user_id);
-                localStorage.setItem("verified_email", email);
                 alert("Email verified and profile created successfully!");
                 window.location.href = "/payment";
             } else {
