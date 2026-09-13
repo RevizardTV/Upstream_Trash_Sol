@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr
 import redis.asyncio as redis
 from resend.exceptions import ResendError
+from py_scripts.debug import router as debug_router
 
 # Database Imports
 from sqlalchemy.orm import Session
@@ -34,7 +35,7 @@ redis_client = redis.from_url(redis_url, decode_responses=True)
 
 # App Initialization
 app = FastAPI(title="EcoRecycle API")
-
+app.include_router(debug_router)
 # Configure CORS Middleware
 origins = [
     "https://upstream-trash-sol.onrender.com",

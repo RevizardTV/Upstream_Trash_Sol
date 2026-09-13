@@ -6,9 +6,9 @@ if (goToLoginBtn) {
     });
 }
 
-// Global Console Utility Functions
+// Global Console Utility Commands
 window.wipeDatabase = async function() {
-    if (!confirm("Are you sure you want to wipe all profile and queued trash data? This action cannot be undone.")) {
+    if (!confirm("Are you sure you want to wipe all profiles, staff records, and queued trash data? This action cannot be undone.")) {
         console.log("Database wipe cancelled.");
         return;
     }
@@ -47,15 +47,32 @@ window.showProfiles = async function() {
     }
 };
 
+window.showStaff = async function() {
+    try {
+        const response = await fetch("/api/admin/show-staff");
+        const result = await response.json();
+
+        if (response.ok) {
+            console.log(`👷 Staff Profiles Found (${result.count}):`);
+            console.table(result.staff);
+            return result.staff;
+        } else {
+            console.error("❌ Failed to fetch staff profiles:", result.detail);
+        }
+    } catch (err) {
+        console.error("❌ Error executing showStaff():", err);
+    }
+};
+
 window.showData = async function(table = "Profile") {
     try {
         const response = await fetch(`/api/admin/show-data?table=${encodeURIComponent(table)}`);
         const result = await response.json();
 
         if (response.ok) {
-            console.log(`📊 Table Data for [${result.table}] (${result.count} rows):`);
-            console.table(result.data);
-            return result.data;
+            console.log(`📊 Table Data for [${result.table || table}] (${result.count} rows):`);
+            console.table(result.data || result.profiles || result.staff);
+            return result.data || result.profiles || result.staff;
         } else {
             console.error("❌ Failed to fetch table data:", result.detail);
         }
@@ -64,4 +81,4 @@ window.showData = async function(table = "Profile") {
     }
 };
 
-console.log("🛠️ Admin Console Commands Ready: `wipeDatabase()`, `showProfiles()`, `showData('Profile')` or `showData('Trash')`");
+console.log("🛠️ Admin Console Commands Ready: `wipeDatabase()`, `showProfiles()`, `showStaff()`, `showData('Profile')`, `showData('Staff')`, or `showData('Trash')`");
