@@ -48,84 +48,77 @@ document.addEventListener("DOMContentLoaded", () => {
     radios.forEach(r => r.addEventListener("change", calculate));
 
     // 4. Form Submission Handler
+    // Replace Section 4 in register_payment.js
     if (form) {
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-            const selected = document.querySelector('input[name="material"]:checked');
-            const weight = parseFloat(weightInput?.value || 0);
+        const selected = document.querySelector('input[name="material"]:checked');
+        const weight = parseFloat(weightInput?.value || 0);
 
-            if (!selected || isNaN(weight) || weight <= 0) {
-                alert("Please select a category and enter a valid weight in kilograms.");
-                return;
-            }
+        if (!selected || isNaN(weight) || weight <= 0) {
+            alert("Please select a category and enter a valid weight in kilograms.");
+            return;
+        }
 
-            const rate = parseFloat(selected.dataset.rate);
-            const payout = rate * weight;
-            const entryType = selected.dataset.type || (payout < 0 ? "charge" : "payout");
+        const rate = parseFloat(selected.dataset.rate);
+        const payout = rate * weight;
+        
+        // Fix: Safely derive waste category string from value or dataset
+        const wasteCategory = selected.dataset.category || selected.value || "Plastic";
 
-            // User ID Resolution Sequence
-            let userId = localStorage.getItem("user_id");
+        let userId = localStorage.getItem("user_id");
 
-            if (!userId) {
-                const verifiedEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
-                if (verifiedEmail) {
-                    try {
-                        const profileRes = await fetch(`/api/user/profile?email=${encodeURIComponent(verifiedEmail)}`);
-                        if (profileRes.ok) {
-                            const profileData = await profileRes.json();
-                            if (profileData?.profile?.id) {
-                                userId = profileData.profile.id;
-                                localStorage.setItem("user_id", userId);
-                            }
+        if (!userId) {
+            const verifiedEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
+            if (verifiedEmail) {
+                try {
+                    const profileRes = await fetch(`/api/user/profile?email=${encodeURIComponent(verifiedEmail)}`);
+                    if (profileRes.ok) {
+                        const profileData = await profileRes.json();
+                        if (profileData?.profile?.id) {
+                            userId = profileData.profile.id;
+                            localStorage.setItem("user_id", userId);
                         }
-                    } catch (err) {
-                        console.error("User resolution error:", err);
                     }
+                } catch (err) {
+                    console.error("User resolution error:", err);
                 }
             }
+        }
 
-            if (!userId) {
-                alert("Unable to verify user profile. Please log in first.");
-                return;
+        if (!userId) {
+            alert("Unable to verify user profile. Please log in first.");
+            return;
+        }
+
+        const payload = {
+            user_id: parseInt(userId),
+            waste_category: wasteCategory,
+            weight_kg: weight,
+            payout_amount: payout
+        };
+
+        try {
+            const response = await fetch("/api/recycling/entry", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                alert(`Drop-off recorded successfully! Entry ID: #${result.entry_id}`);
+                form.reset();
+                calculate();
+            } else {
+                alert(`Submission error: ${result.detail || 'Unknown error'}`);
             }
-
-            // Post Data Entry
-            const payload = {
-                user_id: parseInt(userId),
-                waste_category: selected.value,
-                weight_kg: weight,
-                payout_amount: payout,
-                entry_type: entryType
-            };
-
-            try {
-                const response = await fetch("/api/recycling/entry", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-
-                let result;
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.includes("application/json")) {
-                    result = await response.json();
-                } else {
-                    const textError = await response.text();
-                    throw new Error(`Server returned status ${response.status}: ${textError}`);
-                }
-
-                if (response.ok) {
-                    alert(`Drop-off recorded successfully! Entry ID: ${result.entry_id}`);
-                    form.reset();
-                    calculate();
-                } else {
-                    alert(`Submission error: ${result.detail || 'Unknown error'}`);
-                }
-            } catch (err) {
-                console.error("Submission Failure:", err);
-                alert(`Submission failed: ${err.message}`);
-            }
+        } catch (err) {
+            console.error("Submission Failure:", err);
+            alert(`Submission failed: ${err.message}`);
+        }
         });
     }
 });

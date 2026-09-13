@@ -2,7 +2,7 @@ from hashlib import sha256
 import json
 import os
 import sys
-
+from typing import Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -12,6 +12,7 @@ import redis.asyncio as redis
 from resend.exceptions import ResendError
 
 # Database Imports
+
 from sqlalchemy.orm import Session
 from py_scripts.database import Base, UserProfile, RecyclingEntry, StaffProfile, engine, get_db
 
@@ -527,3 +528,27 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
             status_code=400, 
             detail=f"Unknown table parameter '{table}'."
         )
+        
+# Add to Pydantic Schemas section in main_5.py
+class StaffReviewSchema(BaseModel):
+    action: str  # "approve" or "decline"
+    rejection_reason: Optional[str] = None
+
+# Add to Staff Authorization Endpoints section in main_5.py
+@app.post("/api/staff/users/{user_id}/review")
+async def review_user_profile(
+    user_id: int, 
+    data: StaffReviewSchema, 
+    db: Session = Depends(get_db)
+):
+    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User ID #{user_id} not found.")
+
+    if data.action == "approve":
+        user.profile_complete = True
+    elif data.action == "decline":
+        user.profile_complete = False
+
+    db.commit()
+    return {"status": "success", "message": f"User profile status updated to {data.action}"}

@@ -71,7 +71,7 @@ function renderTable(profiles) {
             <td class="p-3 capitalize">${user.premise_type}</td>
             <td class="p-3 font-mono text-slate-400">${user.upi_id || "N/A"}</td>
             <td class="p-3 text-right">
-                <button onclick="reviewUser(${user.id})" class="bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-slate-950 px-2.5 py-1 rounded text-xs transition font-semibold">
+                <button onclick="reviewUser(${user.id}, '${user.full_name}')" class="bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500 hover:text-slate-950 px-2.5 py-1 rounded text-xs transition font-semibold">
                     Review User
                 </button>
             </td>
@@ -80,6 +80,27 @@ function renderTable(profiles) {
     });
 }
 
-function reviewUser(userId) {
-    alert(`Opening audit logs and recycling records for User ID #${userId}...`);
+// Action Handler for Review User Button
+async function reviewUser(userId, userName) {
+    const action = confirm(`Approve account for ${userName} (ID #${userId})?\n\nClick 'OK' to Approve, or 'Cancel' to Reject.`);
+    const decision = action ? "approve" : "decline";
+
+    try {
+        const res = await fetch(`/api/staff/users/${userId}/review`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: decision })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            alert(`Success: Profile status updated to ${decision.toUpperCase()}`);
+            loadDistrictUsers();
+        } else {
+            alert(`Error: ${data.detail || 'Review failed'}`);
+        }
+    } catch (err) {
+        console.error("Staff review error:", err);
+        alert(`Failed to complete review: ${err.message}`);
+    }
 }
