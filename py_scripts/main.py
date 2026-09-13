@@ -375,13 +375,14 @@ async def review_recycling_entry(
     data: EntryReviewSchema, 
     db: Session = Depends(get_db)
 ):
+    print("REVIEW ENACTED")
     entry = db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Recycling entry not found.")
 
     # Update database attributes
     new_status = "approved" if data.action == "approve" else "declined"
-    
+    print("REVIEW STATUS SET")
     db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).update({
         "status": new_status,
         "reviewed_by_staff_id": data.staff_id,
