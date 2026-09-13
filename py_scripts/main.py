@@ -350,3 +350,41 @@ async def get_pending_payments(
             for entry in entries
         ]
     }
+    
+@app.get("/api/recycling/summary")
+async def get_user_recycling_summary(
+    user_id: int = Query(None), 
+    email: str = Query(None), 
+    db: Session = Depends(get_db)
+):
+    if not user_id and email:
+        user = db.query(UserProfile).filter(UserProfile.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_id = user.id
+
+    entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).all()
+
+    # Financial segregations based on status
+    approved_total = sum(float(e.payout_amount) for e in entries if e.status == "approved")
+    pending_total = sum(float(e.payout_amount) for e in entries if e.status == "pending")
+    total_approved_weight = sum(float(e.weight_kg) for e in entries if e.status == "approved")
+
+    return {
+        "status": "success",
+        "total_earnings": approved_total,
+        "pending_release": pending_total,
+        "eco_credits": int(total_approved_weight * 10),
+        "entries": [
+            {
+                "entry_id": e.entry_id,
+                "waste_category": e.waste_category,
+                "weight_kg": float(e.weight_kg),
+                "payout_amount": float(e.payout_amount),
+                "status": e.status,
+                "rejection_reason": e.rejection_reason,
+                "created_at": e.created_at.isoformat() if e.created_at else None
+            }
+            for e in entries
+        ]
+    }
