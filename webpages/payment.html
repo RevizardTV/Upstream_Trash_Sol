@@ -3,22 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EcoRecycle - Payment Dashboard</title>
-    <!-- Tailwind CSS CDN -->
+    <title>EcoRecycle - Payment Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .nav-btn.active {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex">
 
-    <!-- Sidebar Section -->
+    <!-- SINGLE SHARED SIDEBAR -->
     <aside class="w-72 bg-slate-800/50 border-r border-slate-700/60 p-6 flex flex-col justify-between hidden md:flex">
         <div>
-            <!-- App Logo -->
             <div class="flex items-center gap-3 mb-10 px-2">
                 <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-xl">
                     <i class="fa-solid fa-leaf"></i>
@@ -26,133 +28,123 @@
                 <span class="font-bold text-lg tracking-wide text-white">EcoRecycle</span>
             </div>
 
-            <!-- Restored Profile Details Card -->
+            <!-- Profile Widget -->
             <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 text-center mb-8 relative shadow-lg">
-                <div class="relative w-20 h-20 mx-auto mb-3 flex items-center justify-center rounded-full bg-slate-700/80 border-2 border-slate-600 text-slate-400 text-3xl">
+                <div class="relative w-16 h-16 mx-auto mb-2 flex items-center justify-center rounded-full bg-slate-700/80 border-2 border-slate-600 text-slate-400 text-2xl">
                     <i class="fa-solid fa-user"></i>
-                    <span class="w-3.5 h-3.5 bg-emerald-500 border-2 border-slate-800 rounded-full absolute bottom-1 right-1" title="Online"></span>
                 </div>
-                <h3 id="profileName" class="font-bold text-white text-base tracking-wide">Loading...</h3>
+                <h3 id="profileName" class="font-bold text-white text-sm">Loading...</h3>
                 <p id="profileEmail" class="text-xs text-slate-400 mt-0.5">...</p>
-                <div class="mt-3 inline-block bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-2.5 py-1 rounded-full font-medium">
-                    Verified Recycling Partner
-                </div>
             </div>
 
-            <!-- Side Navigation -->
-            <nav class="space-y-1.5">
-                <a href="/payment" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 font-medium text-sm border border-emerald-500/20">
+            <!-- SPA Navigation -->
+            <nav class="space-y-1.5" id="spaNav">
+                <button data-view="view-options" class="nav-btn active w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition text-sm font-medium">
                     <i class="fa-solid fa-wallet text-base"></i> Payment Options
-                </a>
-                <a href="/pending-payments" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition text-sm font-medium">
+                </button>
+                <button data-view="view-register" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition text-sm font-medium">
+                    <i class="fa-solid fa-circle-plus text-base"></i> Register Payment
+                </button>
+                <button data-view="view-pending" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition text-sm font-medium">
                     <i class="fa-solid fa-clock-rotate-left text-base"></i> Pending Queue
-                </a>
-                <a href="/reviewed-requests" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition text-sm font-medium">
+                </button>
+                <button data-view="view-reviewed" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition text-sm font-medium">
                     <i class="fa-solid fa-clipboard-check text-base"></i> Reviewed Requests
-                </a>
-                <a href="/payment-info" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition text-sm font-medium">
+                </button>
+                <button data-view="view-info" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition text-sm font-medium">
                     <i class="fa-solid fa-circle-info text-base"></i> Payment Info Guide
-                </a>
+                </button>
             </nav>
         </div>
 
-        <!-- Logout Action -->
-        <button onclick="localStorage.clear(); sessionStorage.clear(); window.location.href='/login';" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 transition text-sm font-medium w-full">
+        <button onclick="localStorage.clear(); window.location.href='/login';" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 transition text-sm font-medium w-full">
             <i class="fa-solid fa-right-from-bracket"></i> Sign Out
         </button>
     </aside>
 
-    <!-- Main Dashboard Area -->
+    <!-- DYNAMIC VIEW CONTAINER -->
     <main class="flex-1 p-6 md:p-10 overflow-y-auto">
-        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-slate-800 pb-6">
-            <div>
-                <h1 class="text-2xl md:text-3xl font-bold text-white tracking-tight">Payment Portal</h1>
-                <p class="text-slate-400 text-sm mt-1">Manage payout registrations, active transactions, and account details.</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <span class="bg-slate-800 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700">
-                    <i class="fa-solid fa-shield-halved text-emerald-400 mr-1.5"></i> SSL Encrypted
-                </span>
-            </div>
-        </header>
 
-        <!-- Metrics Overview Section -->
-        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-xl flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Earnings</p>
-                    <p id="totalEarnings" class="text-xl font-bold text-white mt-1">₹0.00</p>
+        <!-- 1. OPTIONS DASHBOARD VIEW -->
+        <section id="view-options" class="view-panel">
+            <header class="mb-8">
+                <h1 class="text-2xl md:text-3xl font-bold text-white">Payment Portal</h1>
+                <p class="text-slate-400 text-sm mt-1">Manage payout registrations and transaction options.</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div onclick="switchTab('view-register')" class="cursor-pointer bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 p-6 rounded-2xl transition shadow-lg">
+                    <i class="fa-solid fa-plus-circle text-emerald-400 text-2xl mb-4"></i>
+                    <h3 class="text-lg font-bold text-white">Register Payment</h3>
+                    <p class="text-slate-400 text-sm mt-2">Log recycling volume and submit payout details.</p>
                 </div>
-                <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                    <i class="fa-solid fa-indian-rupee-sign"></i>
+                <div onclick="switchTab('view-pending')" class="cursor-pointer bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 p-6 rounded-2xl transition shadow-lg">
+                    <i class="fa-solid fa-hourglass-half text-amber-400 text-2xl mb-4"></i>
+                    <h3 class="text-lg font-bold text-white">Pending Queue</h3>
+                    <p class="text-slate-400 text-sm mt-2">Review ongoing entry verification statuses.</p>
                 </div>
-            </div>
-            <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-xl flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Pending Release</p>
-                    <p id="pendingRelease" class="text-xl font-bold text-amber-400 mt-1">₹0.00</p>
-                </div>
-                <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                    <i class="fa-solid fa-clock text-amber-400"></i>
-                </div>
-            </div>
-            <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-xl flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Eco Credits</p>
-                    <p id="ecoCredits" class="text-xl font-bold text-emerald-400 mt-1">0 pts</p>
-                </div>
-                <div class="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center">
-                    <i class="fa-solid fa-award"></i>
+                <div onclick="switchTab('view-reviewed')" class="cursor-pointer bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 p-6 rounded-2xl transition shadow-lg">
+                    <i class="fa-solid fa-clipboard-check text-emerald-400 text-2xl mb-4"></i>
+                    <h3 class="text-lg font-bold text-white">Reviewed Requests</h3>
+                    <p class="text-slate-400 text-sm mt-2">Check finalized payouts and historical records.</p>
                 </div>
             </div>
         </section>
 
-        <!-- Primary Options Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <a href="/register-payment" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between">
+        <!-- 2. REGISTER FORM VIEW -->
+        <section id="view-register" class="view-panel hidden">
+            <header class="mb-8">
+                <h1 class="text-2xl md:text-3xl font-bold text-white">Register Drop-off Entry</h1>
+            </header>
+            <form id="paymentRegisterForm" class="max-w-2xl bg-slate-800/60 border border-slate-700/80 rounded-2xl p-6 space-y-4">
                 <div>
-                    <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-plus-circle"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Register Payment</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Add a new bank account, UPI ID, or digital wallet to receive payouts for recycled materials.</p>
+                    <label class="block text-sm text-slate-300 mb-2">Weight (kg)</label>
+                    <input type="number" step="0.1" required class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white">
                 </div>
-                <div class="mt-6 flex items-center gap-2 text-emerald-400 font-semibold text-sm">
-                    <span>Configure Method</span>
-                    <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
-                </div>
-            </a>
+                <button type="submit" class="bg-emerald-500 text-slate-950 font-bold px-6 py-3 rounded-xl">Submit Transaction</button>
+            </form>
+        </section>
 
-            <a href="/pending-payments" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-amber-500/10 flex flex-col justify-between">
-                <div>
-                    <div class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-hourglass-half"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Pending Payments</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Review incoming transfers, pending verification approvals, and active transaction statuses.</p>
-                </div>
-                <div class="mt-6 flex items-center gap-2 text-amber-400 font-semibold text-sm">
-                    <span id="pendingCardCount">View Queue</span>
-                    <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
-                </div>
-            </a>
+        <!-- 3. PENDING QUEUE VIEW -->
+        <section id="view-pending" class="view-panel hidden">
+            <header class="mb-8">
+                <h1 class="text-2xl md:text-3xl font-bold text-white">Pending Transactions</h1>
+            </header>
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-4">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-700">
+                            <th class="p-3">ID</th>
+                            <th class="p-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingTableBody"></tbody>
+                </table>
+            </div>
+        </section>
 
-            <a href="/reviewed-requests" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between">
-                <div>
-                    <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-clipboard-check"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Reviewed Requests</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Check your approved payouts and view history log for processed submissions.</p>
-                </div>
-                <div class="mt-6 flex items-center gap-2 text-emerald-400 font-semibold text-sm">
-                    <span>View History</span>
-                    <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
-                </div>
-            </a>
-        </div>
+        <!-- 4. REVIEWED REQUESTS VIEW -->
+        <section id="view-reviewed" class="view-panel hidden">
+            <header class="mb-8">
+                <h1 class="text-2xl md:text-3xl font-bold text-white">Reviewed History</h1>
+            </header>
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-4">
+                <tbody id="reviewedTableBody"></tbody>
+            </div>
+        </section>
+
+        <!-- 5. INFO GUIDE VIEW -->
+        <section id="view-info" class="view-panel hidden">
+            <header class="mb-8">
+                <h1 class="text-2xl md:text-3xl font-bold text-white">PAYT Information Guide</h1>
+            </header>
+            <p class="text-slate-300 text-sm">Review processing terms and recycling conversion rules.</p>
+        </section>
+
     </main>
 
-    <script src="/static/js/payment.js"></script>
+    <!-- UNIFIED ROUTING & CONTROL SCRIPT -->
+    <script src="/static/js/master_payment.js">
+    </script>
 </body>
 </html>
