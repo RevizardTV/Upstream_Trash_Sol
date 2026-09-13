@@ -1,3 +1,4 @@
+from hashlib import sha256
 import json
 import os
 import sys
@@ -9,15 +10,24 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr
 import redis.asyncio as redis
 from resend.exceptions import ResendError
-from py_scripts.debug import router as debug_router
 
 # Database Imports
 from sqlalchemy.orm import Session
-from py_scripts.database import Base, UserProfile, RecyclingEntry,StaffProfile, engine, get_db
+from py_scripts.database import Base, UserProfile, RecyclingEntry, StaffProfile, engine, get_db
 
+# Debug Router & Core Utilities
+from py_scripts.debug import router as debug_router
 from py_scripts.config import config
 from py_scripts.emailSend import send_email
 import py_scripts.login as login
+
+# Logging Utilities
+from py_scripts.logging import (
+    PerformanceLoggingMiddleware, 
+    log_auth_event, 
+    log_recycling_action, 
+    logger
+)
 
 # Ensure project directory is in PATH
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -28,15 +38,18 @@ Base.metadata.create_all(bind=engine)
 # Redis Connection Initialization
 redis_url = os.getenv("REDIS_URL") or getattr(config, "REDIS_URL", None)
 if not redis_url:
-    print("CRITICAL ERROR: REDIS_URL is missing")
+    logger.critical("CRITICAL ERROR: REDIS_URL environment variable is missing!")
     sys.exit(1)
 
 redis_client = redis.from_url(redis_url, decode_responses=True)
 
-# App Initialization
+# Application Initialization
 app = FastAPI(title="EcoRecycle API")
-app.include_router(debug_router)
-# Configure CORS Middleware
+
+# Register Performance & Route Timing Middleware
+app.add_middleware(PerformanceLoggingMiddleware)
+
+# CORS Middleware Configuration
 origins = [
     "https://upstream-trash-sol.onrender.com",
     "http://localhost:8000",
@@ -53,14 +66,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Auto-create missing static folders & Mount Static Directories
+# Include Debug Router
+app.include_router(debug_router)
+
+# Mount Static File Directories
 for folder in ["static", "image_assets", "webpages"]:
     os.makedirs(folder, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# Pydantic Validation Schemas
+# Pydantic Schemas
 class OTPRequest(BaseModel):
     email_address: EmailStr
 
@@ -78,10 +94,27 @@ class ProfileCreateSchema(BaseModel):
     household_size: int = 1
     upi_id: str | None = None
 
+class RecyclingEntrySchema(BaseModel):
+    user_id: int
+    waste_category: str
+    weight_kg: float
+    payout_amount: float
+
+    class Config:
+        from_attributes = True
+
+class StaffRegisterSchema(BaseModel):
+    email: EmailStr
+    full_name: str
+    assigned_pincode: str
+    password: str
+
+class StaffLoginSchema(BaseModel):
+    email: EmailStr
+    password: str
 
 
-
-# Page Route Handlers
+# Frontend Webpage Handlers
 @app.get("/")
 async def serve_home():
     return FileResponse("webpages/index.html")
@@ -110,8 +143,20 @@ async def serve_payment_info():
 async def serve_profile_registration():
     return FileResponse("webpages/register_profile.html")
 
+@app.get("/register-staff")
+async def serve_register_staff():
+    return FileResponse("webpages/register_staff.html")
 
-# Authentication & Profile Endpoints
+@app.get("/staff-login")
+async def serve_staff_login():
+    return FileResponse("webpages/staff_login.html")
+
+@app.get("/staff-dashboard")
+async def serve_staff_dashboard():
+    return FileResponse("webpages/staff_dashboard.html")
+
+
+# User Authentication Endpoints
 @app.post("/api/auth/request-otp")
 async def request_otp(data: OTPRequest, request: Request):
     client_ip = request.headers.get("x-forwarded-for")
@@ -123,6 +168,7 @@ async def request_otp(data: OTPRequest, request: Request):
     otp, error = await login.generate_otp(data.email_address, client_ip)
     
     if error or not otp:
+        log_auth_event("OTP_REQUEST", data.email_address, "FAILED", client_ip, error or "Rate limit exceeded")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS, 
             detail=error or "Failed to generate OTP code."
@@ -134,32 +180,36 @@ async def request_otp(data: OTPRequest, request: Request):
             subject="EcoRecycle - Your Login OTP",
             body=otp
         )
+        log_auth_event("OTP_REQUEST", data.email_address, "SUCCESS", client_ip, "OTP sent via email")
         return {"status": "success", "message": "OTP code dispatched successfully"}
         
     except ResendError as re_err:
-        print(f"RESEND API DISPATCH ERROR: {re_err}")
+        log_auth_event("OTP_REQUEST", data.email_address, "ERROR", client_ip, f"Resend API Error: {str(re_err)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Resend Mail Error: {str(re_err)}"
         )
     except Exception as e:
-        print(f"UNEXPECTED MAIL SYSTEM ERROR: {e}")
+        log_auth_event("OTP_REQUEST", data.email_address, "ERROR", client_ip, f"Mail delivery error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail="OTP saved to database, but email delivery service failed."
         )
 
 @app.post("/api/auth/verify-otp")
-async def verify_otp_route(data: OTPVerify):
+async def verify_otp_route(data: OTPVerify, request: Request):
+    client_ip = request.client.host if request.client else "127.0.0.1"
     try:
         is_valid, error = await login.verify_otp(data.email_address, data.otp_code)
         
         if not is_valid:
+            log_auth_event("OTP_VERIFY", data.email_address, "FAILED", client_ip, error or "Invalid code")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
                 detail=error or "Invalid or expired verification code."
             )
             
+        log_auth_event("OTP_VERIFY", data.email_address, "SUCCESS", client_ip, "Session cookie granted")
         response = JSONResponse(
             content={"status": "success", "message": "OTP verified successfully."}
         )
@@ -175,7 +225,7 @@ async def verify_otp_route(data: OTPVerify):
     except HTTPException as he:
         raise he
     except Exception as e:
-        print(f"VERIFICATION ROUTE ERROR: {e}")
+        logger.error(f"OTP Verification system failure for {data.email_address}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while verifying the OTP."
@@ -188,9 +238,11 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
     if not user:
         user = UserProfile(**data.model_dump())
         db.add(user)
+        logger.info(f"Created new user profile for {data.email}")
     else:
         for field, value in data.model_dump().items():
             setattr(user, field, value)
+        logger.info(f"Updated existing user profile for User ID #{user.id}")
             
     db.commit()
     db.refresh(user)
@@ -205,7 +257,84 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
     return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
 
 
-# Recycling Insertion Endpoint
+# User Profile & Data Endpoints
+@app.get("/api/user/profile")
+async def get_user_profile(user_id: int = Query(None), email: str = Query(None), db: Session = Depends(get_db)):
+    if not user_id and not email:
+        raise HTTPException(status_code=400, detail="Must provide user_id or email query parameter")
+    
+    query = db.query(UserProfile)
+    if user_id:
+        user = query.filter(UserProfile.id == user_id).first()
+    else:
+        user = query.filter(UserProfile.email == email).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    return {
+        "status": "success",
+        "profile": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "phone_number": user.phone_number,
+            "city": user.city,
+            "postal_code": user.postal_code,
+            "premise_type": user.premise_type,
+            "household_size": user.household_size,
+            "upi_id": user.upi_id
+        }
+    }
+
+
+# Staff Authorization Endpoints
+@app.post("/api/staff/register")
+async def register_staff_account(data: StaffRegisterSchema, request: Request, db: Session = Depends(get_db)):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    existing = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
+    if existing:
+        log_auth_event("STAFF_REGISTER", data.email, "FAILED", client_ip, "Duplicate email")
+        raise HTTPException(status_code=400, detail="Staff account with this email already exists.")
+    
+    hashed_password = sha256(data.password.encode()).hexdigest()
+    new_staff = StaffProfile(
+        email=data.email,
+        full_name=data.full_name,
+        assigned_pincode=data.assigned_pincode,
+        password_hash=hashed_password
+    )
+    db.add(new_staff)
+    db.commit()
+    db.refresh(new_staff)
+    
+    log_auth_event("STAFF_REGISTER", data.email, "SUCCESS", client_ip, f"Assigned PIN: {data.assigned_pincode}")
+    return {"status": "success", "message": "Staff registered successfully!", "staff_id": new_staff.id}
+
+@app.post("/api/staff/login")
+async def login_staff_account(data: StaffLoginSchema, request: Request, db: Session = Depends(get_db)):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    hashed_password = sha256(data.password.encode()).hexdigest()
+    
+    staff = db.query(StaffProfile).filter(
+        StaffProfile.email == data.email, 
+        StaffProfile.password_hash == hashed_password
+    ).first()
+    
+    if not staff:
+        log_auth_event("STAFF_LOGIN", data.email, "FAILED", client_ip, "Invalid credentials")
+        raise HTTPException(status_code=401, detail="Invalid staff credentials.")
+        
+    log_auth_event("STAFF_LOGIN", data.email, "SUCCESS", client_ip, f"Staff ID: {staff.id}")
+    return {
+        "status": "success", 
+        "staff_id": staff.id, 
+        "email": staff.email, 
+        "assigned_pincode": staff.assigned_pincode
+    }
+
+
+# Recycling & Waste Transactions
 @app.post("/api/recycling/entry")
 async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(get_db)):
     try:
@@ -218,6 +347,7 @@ async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(
         db.commit()
         db.refresh(new_entry)
         
+        log_recycling_action("SUBMIT", data.user_id, data.weight_kg, "PENDING", f"Category: {data.waste_category}")
         return {
             "status": "success", 
             "message": "Recycling transaction recorded!", 
@@ -227,11 +357,129 @@ async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(
         raise he
     except Exception as e:
         db.rollback()
-        print(f"RECYCLING ENTRY ERROR: {str(e)}")
+        logger.error(f"Failed to save recycling entry for User ID #{data.user_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database insertion failed: {str(e)}")
 
+@app.get("/api/recycling/pending-payments")
+async def get_pending_payments(
+    user_id: int = Query(None), 
+    email: str = Query(None), 
+    db: Session = Depends(get_db)
+):
+    if not user_id and not email:
+        raise HTTPException(status_code=400, detail="Must provide user_id or email")
+    
+    if not user_id and email:
+        user = db.query(UserProfile).filter(UserProfile.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User profile not found")
+        user_id = user.id
 
-# Admin & Data Inspection Utilities
+    entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).order_by(RecyclingEntry.entry_id.desc()).all()
+    total_payout = sum(float(entry.payout_amount) for entry in entries)
+
+    return {
+        "status": "success",
+        "user_id": user_id,
+        "total_pending_amount": total_payout,
+        "count": len(entries),
+        "entries": [
+            {
+                "entry_id": entry.entry_id,
+                "waste_category": entry.waste_category,
+                "weight_kg": float(entry.weight_kg),
+                "payout_amount": float(entry.payout_amount),
+                "created_at": entry.created_at.isoformat() if entry.created_at else None
+            }
+            for entry in entries
+        ]
+    }
+
+@app.get("/api/recycling/summary")
+async def get_user_recycling_summary(
+    user_id: int = Query(None), 
+    email: str = Query(None), 
+    db: Session = Depends(get_db)
+):
+    if not user_id and email:
+        user = db.query(UserProfile).filter(UserProfile.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_id = user.id
+
+    entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).all()
+
+    approved_total = sum(float(e.payout_amount) for e in entries if getattr(e, "status", "pending") == "approved")
+    pending_total = sum(float(e.payout_amount) for e in entries if getattr(e, "status", "pending") == "pending")
+    total_approved_weight = sum(float(e.weight_kg) for e in entries if getattr(e, "status", "pending") == "approved")
+
+    return {
+        "status": "success",
+        "total_earnings": approved_total,
+        "pending_release": pending_total,
+        "eco_credits": int(total_approved_weight * 10),
+        "entries": [
+            {
+                "entry_id": e.entry_id,
+                "waste_category": e.waste_category,
+                "weight_kg": float(e.weight_kg),
+                "payout_amount": float(e.payout_amount),
+                "status": getattr(e, "status", "pending"),
+                "rejection_reason": getattr(e, "rejection_reason", None),
+                "created_at": e.created_at.isoformat() if e.created_at else None
+            }
+            for e in entries
+        ]
+    }
+
+
+# Staff District Inspection API
+@app.get("/api/admin/district-users")
+async def get_district_users(
+    staff_pincode: str = Query(...),
+    search: str = Query(None),
+    exact_pincode: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    if len(staff_pincode) < 3:
+        raise HTTPException(status_code=400, detail="Staff pincode must be at least 3 digits.")
+
+    district_prefix = staff_pincode[:3]
+    query = db.query(UserProfile).filter(UserProfile.postal_code.like(f"{district_prefix}%"))
+
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            (UserProfile.full_name.ilike(search_filter)) | 
+            (UserProfile.email.ilike(search_filter))
+        )
+
+    if exact_pincode:
+        query = query.filter(UserProfile.postal_code == exact_pincode)
+
+    profiles = query.all()
+
+    return {
+        "status": "success",
+        "district_prefix": district_prefix,
+        "count": len(profiles),
+        "profiles": [
+            {
+                "id": p.id,
+                "full_name": p.full_name,
+                "email": p.email,
+                "phone_number": p.phone_number,
+                "city": p.city,
+                "postal_code": p.postal_code,
+                "premise_type": p.premise_type,
+                "household_size": p.household_size,
+                "upi_id": p.upi_id
+            } for p in profiles
+        ]
+    }
+
+
+# Admin Data Inspection Utility
 @app.get("/api/admin/show-data")
 async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
     table_lower = table.lower()
@@ -275,177 +523,3 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
             status_code=400, 
             detail=f"Unknown table parameter '{table}'."
         )
-
-@app.get("/api/user/profile")
-async def get_user_profile(user_id: int = Query(None), email: str = Query(None), db: Session = Depends(get_db)):
-    if not user_id and not email:
-        raise HTTPException(status_code=400, detail="Must provide user_id or email query parameter")
-    
-    query = db.query(UserProfile)
-    if user_id:
-        user = query.filter(UserProfile.id == user_id).first()
-    else:
-        user = query.filter(UserProfile.email == email).first()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="Profile not found")
-
-    return {
-        "status": "success",
-        "profile": {
-            "id": user.id,
-            "email": user.email,
-            "full_name": user.full_name,
-            "phone_number": user.phone_number,
-            "city": user.city,
-            "postal_code": user.postal_code,
-            "premise_type": user.premise_type,
-            "household_size": user.household_size,
-            "upi_id": user.upi_id
-        }
-    }
-
-class RecyclingEntrySchema(BaseModel):
-    user_id: int
-    waste_category: str
-    weight_kg: float
-    payout_amount: float
-
-    class Config:
-        from_attributes = True
-
-@app.get("/api/recycling/pending-payments")
-async def get_pending_payments(
-    user_id: int = Query(None), 
-    email: str = Query(None), 
-    db: Session = Depends(get_db)
-):
-    if not user_id and not email:
-        raise HTTPException(status_code=400, detail="Must provide user_id or email")
-    
-    # Resolve user_id if email was passed
-    if not user_id and email:
-        user = db.query(UserProfile).filter(UserProfile.email == email).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User profile not found")
-        user_id = user.id
-
-    # Query entries for the target user
-    entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).order_by(RecyclingEntry.entry_id.desc()).all()
-    
-    total_payout = sum(float(entry.payout_amount) for entry in entries)
-
-    return {
-        "status": "success",
-        "user_id": user_id,
-        "total_pending_amount": total_payout,
-        "count": len(entries),
-        "entries": [
-            {
-                "entry_id": entry.entry_id,
-                "waste_category": entry.waste_category,
-                "weight_kg": float(entry.weight_kg),
-                "payout_amount": float(entry.payout_amount),
-                "created_at": entry.created_at.isoformat() if entry.created_at else None
-            }
-            for entry in entries
-        ]
-    }
-    
-@app.get("/api/recycling/summary")
-async def get_user_recycling_summary(
-    user_id: int = Query(None), 
-    email: str = Query(None), 
-    db: Session = Depends(get_db)
-):
-    if not user_id and email:
-        user = db.query(UserProfile).filter(UserProfile.email == email).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        user_id = user.id
-
-    entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).all()
-
-    # Financial segregations based on status
-    approved_total = sum(float(e.payout_amount) for e in entries if e.status == "approved")
-    pending_total = sum(float(e.payout_amount) for e in entries if e.status == "pending")
-    total_approved_weight = sum(float(e.weight_kg) for e in entries if e.status == "approved")
-
-    return {
-        "status": "success",
-        "total_earnings": approved_total,
-        "pending_release": pending_total,
-        "eco_credits": int(total_approved_weight * 10),
-        "entries": [
-            {
-                "entry_id": e.entry_id,
-                "waste_category": e.waste_category,
-                "weight_kg": float(e.weight_kg),
-                "payout_amount": float(e.payout_amount),
-                "status": e.status,
-                "rejection_reason": e.rejection_reason,
-                "created_at": e.created_at.isoformat() if e.created_at else None
-            }
-            for e in entries
-        ]
-    }
-    
-    from pydantic import BaseModel
-from hashlib import sha256
-
-# Pydantic Schemas for Staff Authorization
-class StaffRegisterSchema(BaseModel):
-    email: EmailStr
-    full_name: str
-    assigned_pincode: str
-    password: str
-
-class StaffLoginSchema(BaseModel):
-    email: EmailStr
-    password: str
-
-# Serve Staff HTML Pages
-@app.get("/register-staff")
-async def serve_register_staff():
-    return FileResponse("webpages/register_staff.html")
-
-@app.get("/staff-login")
-async def serve_staff_login():
-    return FileResponse("webpages/staff_login.html")
-
-# Staff Authentication API Endpoints
-@app.post("/api/staff/register")
-async def register_staff_account(data: StaffRegisterSchema, db: Session = Depends(get_db)):
-    existing = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Staff account with this email already exists.")
-    
-    hashed_password = sha256(data.password.encode()).hexdigest()
-    new_staff = StaffProfile(
-        email=data.email,
-        full_name=data.full_name,
-        assigned_pincode=data.assigned_pincode,
-        password_hash=hashed_password
-    )
-    db.add(new_staff)
-    db.commit()
-    db.refresh(new_staff)
-    return {"status": "success", "message": "Staff registered successfully!", "staff_id": new_staff.id}
-
-@app.post("/api/staff/login")
-async def login_staff_account(data: StaffLoginSchema, db: Session = Depends(get_db)):
-    hashed_password = sha256(data.password.encode()).hexdigest()
-    staff = db.query(StaffProfile).filter(
-        StaffProfile.email == data.email, 
-        StaffProfile.password_hash == hashed_password
-    ).first()
-    
-    if not staff:
-        raise HTTPException(status_code=401, detail="Invalid staff credentials.")
-        
-    return {
-        "status": "success", 
-        "staff_id": staff.id, 
-        "email": staff.email, 
-        "assigned_pincode": staff.assigned_pincode
-    }
