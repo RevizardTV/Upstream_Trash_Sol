@@ -1,170 +1,129 @@
-const API_URL = "/api/auth";
-const otpTimer = document.getElementById("otpTimer");
-let otpIntervalId = null;
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("profileForm");
+    if (!form) return;
 
-async function apiPost(endpoint, bodyData) {
-    const response = await fetch(`${API_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyData)
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || "Something went wrong!");
-    return data;
-}
-
-const regState = {
-    get step() { return sessionStorage.getItem('reg_step') || 'form'; },
-    set step(val) { sessionStorage.setItem('reg_step', val); },
-    get profileData() { 
-        const raw = sessionStorage.getItem('temp_profile_data');
-        return raw ? JSON.parse(raw) : null;
-    },
-    set profileData(val) { 
-        sessionStorage.setItem('temp_profile_data', JSON.stringify(val)); 
+    // Inject OTP UI elements if not present in the HTML template
+    let otpSection = document.getElementById("otpSection");
+    if (!otpSection) {
+        otpSection = document.createElement("div");
+        otpSection.id = "otpSection";
+        otpSection.className = "hidden space-y-4 mt-4 pt-4 border-t border-slate-700";
+        otpSection.innerHTML = `
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-1">Enter 6-Digit OTP Code</label>
+                <input type="text" id="otpCode" maxlength="6" placeholder="123456" 
+                       class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white font-mono text-center text-lg tracking-widest focus:outline-none focus:border-emerald-500">
+            </div>
+            <button type="button" id="verifyAndSubmitBtn" 
+                    class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
+                Verify OTP & Complete Registration
+            </button>
+        `;
+        form.appendChild(otpSection);
     }
-};
 
-const ViewManager = {
-    render() {
-        const profileForm = document.getElementById('profileRegisterForm');
-        const otpForm = document.getElementById('otpForm');
-        
-        if (regState.step === 'otp') {
-            if (profileForm) profileForm.style.display = 'none';
-            if (otpForm) otpForm.style.display = 'block';
-            startCountdownTimer(60);
-        } else {
-            if (profileForm) profileForm.style.display = 'block';
-            if (otpForm) otpForm.style.display = 'none';
-        }
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.textContent = "Send Verification Code";
 
-        const errEl = document.getElementById('errorMessage');
-        if (errEl) errEl.textContent = "";
-    }
-};
+    let isOtpSent = false;
 
-function startCountdownTimer(durationSeconds) {
-    if (otpIntervalId) clearInterval(otpIntervalId);
-    if (!otpTimer) return;
+    // STEP 1: Send OTP to user's email
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-    let timeRemaining = durationSeconds;
-    function tick() {
-        if (timeRemaining <= 0) {
-            clearInterval(otpIntervalId);
-            otpTimer.textContent = "OTP expired. Please refresh and re-submit.";
-            otpTimer.style.color = "#f87171";
+        if (isOtpSent) return;
+
+        const email = document.getElementById("email").value.trim();
+        if (!email) {
+            alert("Please provide a valid email address.");
             return;
         }
-        const minutes = Math.floor(timeRemaining / 60);
-        const seconds = timeRemaining % 60;
-        otpTimer.textContent = `OTP Expires in ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        otpTimer.style.color = "";
-        timeRemaining--;
-    }
-    tick();
-    otpIntervalId = setInterval(tick, 1000);
-}
 
-async function handleProfileSubmit(event) {
-    event.preventDefault();
-    const submitBtn = document.getElementById('submitBtn');
-    const errContainer = document.getElementById('errorMessage');
-    if (errContainer) errContainer.textContent = "";
+        try {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Sending Code...";
 
-    const payload = {
-        email: document.getElementById("email").value.trim(),
-        full_name: document.getElementById("fullName").value.trim(),
-        phone_number: document.getElementById("phoneNumber").value.trim(),
-        city: document.getElementById("city").value.trim(),
-        postal_code: document.getElementById("postalCode").value.trim(),
-        premise_type: document.getElementById("premiseType").value,
-        household_size: parseInt(document.getElementById("householdSize").value, 10),
-        upi_id: document.getElementById("upiId").value.trim() || null
-    };
+            const res = await fetch("/api/auth/request-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email_address: email })
+            });
 
-    submitBtn.disabled = true;
-    submitBtn.innerText = "Dispatching OTP...";
+            const data = await res.json();
 
-    try {
-        await apiPost('/request-otp', { email_address: payload.email });
-        
-        regState.profileData = payload;
-        regState.step = 'otp';
-        ViewManager.render();
-    } catch (err) {
-        if (errContainer) errContainer.textContent = err.message;
-        submitBtn.disabled = false;
-        submitBtn.innerText = "Send OTP & Register Profile";
-    }
-}
+            if (res.ok) {
+                alert("Verification code sent to your email!");
+                isOtpSent = true;
+                submitBtn.classList.add("hidden");
+                otpSection.classList.remove("hidden");
+            } else {
+                alert("OTP Request Failed: " + (data.detail || "Unable to send code."));
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Send Verification Code";
+            }
+        } catch (err) {
+            console.error("OTP generation error:", err);
+            alert("Failed to communicate with authentication server.");
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Send Verification Code";
+        }
+    });
 
-async function handleVerifyAndSaveProfile(event) {
-    event.preventDefault();
-    const code = document.getElementById('otpInput').value.trim();
-    const errorDisplay = document.getElementById('errorMessage');
-    const alertBox = document.getElementById('statusAlert');
-    const verifyBtn = document.getElementById('verifyBtn');
-    
-    if (errorDisplay) errorDisplay.textContent = "";
+    // STEP 2: Verify OTP and save profile
+    document.getElementById("verifyAndSubmitBtn").addEventListener("click", async () => {
+        const email = document.getElementById("email").value.trim();
+        const otpCode = document.getElementById("otpCode").value.trim();
 
-    const cachedData = regState.profileData;
-    if (!cachedData || !cachedData.email) {
-        if (errorDisplay) errorDisplay.textContent = "Profile session expired. Please reload and submit again.";
-        return;
-    }
-
-    verifyBtn.disabled = true;
-    verifyBtn.innerText = "Verifying & Saving Profile...";
-
-    try {
-        // Step A: Verify OTP
-        await apiPost('/verify-otp', { 
-            email_address: cachedData.email, 
-            otp_code: code 
-        });
-
-        // Step B: Complete profile and get user_id
-        const result = await apiPost('/complete-profile', cachedData);
-
-        if (otpIntervalId) clearInterval(otpIntervalId);
-
-        // Save Auth Identifiers to both storage layers
-        sessionStorage.setItem("verified_email", cachedData.email);
-        localStorage.setItem("verified_email", cachedData.email);
-        
-        if (result.user_id) {
-            localStorage.setItem("user_id", result.user_id);
+        if (otpCode.length !== 6) {
+            alert("Please enter a valid 6-digit OTP code.");
+            return;
         }
 
-        // Cleanup temporary registration session state
-        sessionStorage.removeItem('temp_profile_data');
-        sessionStorage.removeItem('reg_step');
+        try {
+            // 1. Verify OTP
+            const verifyRes = await fetch("/api/auth/verify-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email_address: email, otp_code: otpCode })
+            });
 
-        if (alertBox) {
-            alertBox.className = "mb-4 p-3 rounded-xl text-xs text-center border bg-emerald-500/20 border-emerald-500 text-emerald-300";
-            alertBox.innerText = "Profile verified and created successfully! Redirecting to payment dashboard...";
-            alertBox.classList.remove("hidden");
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+                alert("Verification failed: " + (verifyData.detail || "Invalid code."));
+                return;
+            }
+
+            // 2. Submit Profile Details
+            const profilePayload = {
+                email: email,
+                full_name: document.getElementById("fullName")?.value || "",
+                phone_number: document.getElementById("phoneNumber")?.value || "",
+                city: document.getElementById("city")?.value || "",
+                postal_code: document.getElementById("postalCode")?.value || "",
+                premise_type: document.getElementById("premiseType")?.value || "house",
+                household_size: parseInt(document.getElementById("householdSize")?.value || 1),
+                upi_id: document.getElementById("upiId")?.value || null
+            };
+
+            const saveRes = await fetch("/api/auth/complete-profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(profilePayload)
+            });
+
+            const saveData = await saveRes.json();
+
+            if (saveRes.ok) {
+                localStorage.setItem("user_id", saveData.user_id);
+                localStorage.setItem("verified_email", email);
+                alert("Email verified and profile created successfully!");
+                window.location.href = "/payment";
+            } else {
+                alert("Profile saving failed: " + (saveData.detail || "Unknown error"));
+            }
+        } catch (err) {
+            console.error("Profile creation error:", err);
+            alert("Network error processing registration.");
         }
-
-        setTimeout(() => {
-            window.location.href = "/payment";
-        }, 500);
-
-    } catch (err) {
-        if (errorDisplay) errorDisplay.textContent = err.message;
-        verifyBtn.disabled = false;
-        verifyBtn.innerText = "Verify OTP & Finalize Profile";
-    }
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const savedEmail = urlParams.get("email") || sessionStorage.getItem("verified_email");
-    const emailField = document.getElementById("email");
-    if (savedEmail && emailField) {
-        emailField.value = savedEmail;
-    }
-
-    ViewManager.render();
+    });
 });
