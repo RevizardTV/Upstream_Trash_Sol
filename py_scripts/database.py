@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Generator, List, Optional
-from sqlalchemy import create_engine, text,Enum, String, ForeignKey,Numeric,func
+from sqlalchemy import create_engine, text,Enum, String, ForeignKey,Numeric,func,Integer,DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session, relationship
 from py_scripts.config import config
 
@@ -59,20 +59,23 @@ class RecyclingEntry(Base):
 class UserProfile(Base):
     __tablename__ = "user_profiles"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(50), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=False)
-    postal_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    premise_type: Mapped[str] = mapped_column(String(50), default="house", nullable=False)
-    household_size: Mapped[int] = mapped_column(default=1, nullable=False)
+    postal_code: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
+    premise_type: Mapped[str] = mapped_column(String(50), default="house", server_default="house")
+    household_size: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     upi_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    
+    # Fixes the MySQL 1364 default value error:
+    profile_complete: Mapped[bool] = mapped_column(default=True, server_default="1")
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    # Relationship to entries
-    entries: Mapped[list["RecyclingEntry"]] = relationship("RecyclingEntry", back_populates="user", cascade="all, delete-orphan")
-
+    # Relationship mapping
+    recycling_entries: Mapped[list["RecyclingEntry"]] = relationship("RecyclingEntry", back_populates="user")
 
 
 

@@ -235,12 +235,16 @@ async def verify_otp_route(data: OTPVerify, request: Request):
 async def save_user_profile(data: ProfileCreateSchema, response: Response, db: Session = Depends(get_db)):
     user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
     
+    # Convert incoming Pydantic data to a dictionary and explicitly add profile_complete
+    user_data = data.model_dump()
+    user_data["profile_complete"] = True
+
     if not user:
-        user = UserProfile(**data.model_dump())
+        user = UserProfile(**user_data)
         db.add(user)
         logger.info(f"Created new user profile for {data.email}")
     else:
-        for field, value in data.model_dump().items():
+        for field, value in user_data.items():
             setattr(user, field, value)
         logger.info(f"Updated existing user profile for User ID #{user.id}")
             
