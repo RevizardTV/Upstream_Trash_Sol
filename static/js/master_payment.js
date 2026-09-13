@@ -173,11 +173,19 @@ async function loadReviewedRequests() {
                 return;
             }
 
+            // Locate inside loadReviewedRequests() within master_payment.js:
             data.entries.forEach(entry => {
                 const isApproved = entry.status === "approved";
                 const statusBadge = isApproved
                     ? `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full text-xs font-semibold">Approved</span>`
                     : `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-full text-xs font-semibold">Declined</span>`;
+
+                // Download button rendering for approved transactions
+                const downloadBtn = isApproved 
+                    ? `<a href="/api/recycling/receipt/${entry.entry_id}" download class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-lg text-xs font-medium transition">
+                        <i class="fa-solid fa-file-pdf"></i> Receipt
+                    </a>`
+                    : `<span class="text-xs text-slate-500">${entry.rejection_reason || 'N/A'}</span>`;
 
                 const tr = document.createElement("tr");
                 tr.className = "border-b border-slate-700/40 hover:bg-slate-800/40 transition";
@@ -187,7 +195,7 @@ async function loadReviewedRequests() {
                     <td class="py-3.5 px-4 font-mono text-slate-300">${entry.weight_kg.toFixed(2)} kg</td>
                     <td class="py-3.5 px-4 font-bold ${isApproved ? 'text-emerald-400' : 'text-slate-400'}">₹${entry.payout_amount.toFixed(2)}</td>
                     <td class="py-3.5 px-4">${statusBadge}</td>
-                    <td class="py-3.5 px-4 text-right text-xs text-slate-400">${entry.rejection_reason || 'N/A'}</td>
+                    <td class="py-3.5 px-4 text-right">${downloadBtn}</td>
                 `;
                 tbody.appendChild(tr);
             });

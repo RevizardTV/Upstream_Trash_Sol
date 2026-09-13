@@ -20,7 +20,10 @@ from py_scripts.debug import router as debug_router
 from py_scripts.config import config
 from py_scripts.emailSend import send_email
 import py_scripts.login as login
-
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import StreamingResponse
+import io
+from pdf_generator import generate_receipt_pdf
 # Logging Utilities
 from py_scripts.logging import (
     PerformanceLoggingMiddleware, 
@@ -645,6 +648,38 @@ async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
             for e in entries
         ]
     }
+
+@app.get("/api/recycling/receipt/{entry_id}")
+async def download_receipt(entry_id: int):
+    # Replace this lookup dictionary with your actual database query (e.g., SQLAlchemy/SQLModel)
+    # Example DB query: entry = await db.query(RecyclingEntry).filter_by(id=entry_id).first()
+    
+    # Mock lookup for demonstration structure
+    mock_entry = {
+        "entry_id": entry_id,
+        "waste_category": "plastic",
+        "weight_kg": 12.5,
+        "payout_amount": 150.00,
+        "status": "approved",
+        "station_id": "BIN-COIMBATORE-08",
+        "created_at": "2026-03-28",
+        "user_name": "Jane Doe"
+    }
+
+    if not mock_entry:
+        raise HTTPException(status_code=404, detail="Recycling entry not found.")
+
+    # Generate PDF bytes
+    pdf_bytes = generate_receipt_pdf(mock_entry)
+
+    # Stream as downloadable PDF response
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=receipt_entry_{entry_id}.pdf"
+        }
+    )
 
 # --- REVIEW (Approve / Decline) Waste Entry ---
 @app.post("/api/staff/entries/{entry_id}/review")
