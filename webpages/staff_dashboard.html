@@ -1,86 +1,373 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EcoRecycle - District Staff Dashboard</title>
+    <title>EcoRecycle - District Control Console</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .accordion-content {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .accordion-content.hidden {
+            display: none;
+        }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen p-6">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
 
-    <div class="max-w-6xl mx-auto space-y-6">
-        
-        <!-- Header Controls -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-            <div>
-                <h1 class="text-2xl font-extrabold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-building-user text-amber-400"></i> District Control Console
-                </h1>
-                <p class="text-xs text-slate-400 mt-1">
-                    Assigned Officer: <span id="staffEmailDisplay" class="text-slate-200 font-semibold">---</span> | 
-                    District Zone Prefix: <span id="districtZoneDisplay" class="text-amber-400 font-bold">---</span>
-                </p>
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 border-b border-slate-800/80 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-xl shadow-lg shadow-amber-500/5">
+                    <i class="fa-solid fa-building-user"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight text-white flex items-center gap-2">
+                        District Control Console
+                    </h1>
+                    <p class="text-xs text-slate-400">
+                        Assigned Officer: <span id="officerEmail" class="text-slate-200 font-medium">nkeerthiganesh@gmail.com</span> 
+                        <span class="mx-1 text-slate-600">|</span> 
+                        District Zone Prefix: <span id="districtZonePrefix" class="text-amber-400 font-semibold font-mono">64109</span> 
+                        <span class="text-slate-400 text-[11px]">(District Prefix: <span id="districtPrefix" class="font-mono">641</span>)</span>
+                    </p>
+                </div>
             </div>
-            <button id="logoutBtn" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-semibold px-4 py-2 rounded-xl text-xs transition self-start md:self-auto">
-                <i class="fa-solid fa-right-from-bracket"></i> Log Out
+
+            <button onclick="logoutStaff()" class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 hover:border-rose-500/40 transition text-xs font-semibold">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Log Out</span>
             </button>
         </div>
+    </header>
 
-        <!-- Search & Filter Controls -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/60 border border-slate-800/80 p-4 rounded-2xl">
-            <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1">Search Household / Email</label>
-                <input type="text" id="searchInput" placeholder="Name or email address..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1">Filter by Exact PIN Code</label>
-                <input type="text" id="pinInput" placeholder="e.g. 641001" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
-            </div>
-            <div class="flex items-end gap-2">
-                <button id="filterBtn" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 px-4 rounded-xl text-xs transition">
-                    <i class="fa-solid fa-filter"></i> Apply Filters
-                </button>
-                <button id="resetBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 px-4 rounded-xl text-xs transition">
-                    Reset
-                </button>
-            </div>
-        </div>
+    <!-- Main Workspace Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-        <!-- Household Records Table -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
-                <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-users text-amber-400"></i> District Household Profiles
-                </h3>
-                <span id="recordCount" class="text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full">0 found</span>
+        <!-- Search & Filter Bar Section -->
+        <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 backdrop-blur-xl shadow-xl">
+            <form id="filterForm" onsubmit="handleFilterSubmit(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                
+                <!-- Search Name / Email -->
+                <div class="md:col-span-4 space-y-1.5">
+                    <label for="searchInput" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Search Household / Email</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                        <input type="text" id="searchInput" placeholder="Name or email address..." class="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition">
+                    </div>
+                </div>
+
+                <!-- Exact PIN Search -->
+                <div class="md:col-span-4 space-y-1.5">
+                    <label for="pincodeInput" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Filter by Exact PIN Code</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-location-dot absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                        <input type="text" id="pincodeInput" placeholder="e.g. 641001" class="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 font-mono focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition">
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="md:col-span-4 flex items-end gap-3 pt-2 md:pt-0">
+                    <button type="submit" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition flex items-center justify-center gap-2 text-sm">
+                        <i class="fa-solid fa-filter text-xs"></i>
+                        <span>Apply Filters</span>
+                    </button>
+
+                    <button type="button" onclick="resetFilters()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60 hover:border-slate-600 transition text-sm font-semibold">
+                        Reset
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- District Household Profiles Table Workspace -->
+        <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl">
+            
+            <!-- Table Sub-Header -->
+            <div class="px-6 py-4 border-b border-slate-800/80 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-users text-amber-400 text-lg"></i>
+                    <h2 class="font-bold text-base text-white">District Household Profiles</h2>
+                </div>
+                <span id="profilesCountBadge" class="bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold px-3 py-1 rounded-full text-xs font-mono">
+                    0 found
+                </span>
             </div>
+
+            <!-- Profiles Master Table -->
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-slate-300">
-                    <thead class="bg-slate-800/60 text-slate-400 uppercase tracking-wider border-b border-slate-800">
-                        <tr>
-                            <th class="p-3">ID</th>
-                            <th class="p-3">Full Name</th>
-                            <th class="p-3">Email</th>
-                            <th class="p-3">PIN Code</th>
-                            <th class="p-3">Premise</th>
-                            <th class="p-3">UPI ID</th>
-                            <th class="p-3 text-right">Action</th>
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-950/40 text-slate-400 border-b border-slate-800/80 text-xs uppercase tracking-wider">
+                            <th class="py-3.5 px-6 font-semibold">ID</th>
+                            <th class="py-3.5 px-6 font-semibold">Full Name</th>
+                            <th class="py-3.5 px-6 font-semibold">Email</th>
+                            <th class="py-3.5 px-6 font-semibold">Pin Code</th>
+                            <th class="py-3.5 px-6 font-semibold">Premise</th>
+                            <th class="py-3.5 px-6 font-semibold">UPI ID</th>
+                            <th class="py-3.5 px-6 font-semibold text-right">Pending Requests</th>
                         </tr>
                     </thead>
-                    <tbody id="userTableBody" class="divide-y divide-slate-800/50">
-                        <!-- Dynamic User Rows -->
+                    <tbody id="householdProfilesTbody" class="divide-y divide-slate-800/50">
+                        <!-- Dynamic content rendered by JS -->
+                        <tr>
+                            <td colspan="7" class="py-12 text-center text-slate-500">
+                                <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2 text-amber-500"></i>
+                                <p class="text-xs font-medium">Fetching registered district profiles...</p>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
+    </main>
 
-    </div>
+    <!-- Embedded Dynamic Dashboard Scripting -->
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            initializeDashboard();
+        });
 
-    <script src="/static/js/staff_dashboard.js"></script>
+        function initializeDashboard() {
+            const staffEmail = localStorage.getItem("staff_email") || "nkeerthiganesh@gmail.com";
+            const staffPincode = localStorage.getItem("assigned_pincode") || "64109";
+            
+            document.getElementById("officerEmail").textContent = staffEmail;
+            document.getElementById("districtZonePrefix").textContent = staffPincode;
+            document.getElementById("districtPrefix").textContent = staffPincode.substring(0, 3);
+
+            fetchDistrictData();
+        }
+
+        async function fetchDistrictData(searchQuery = "", exactPincode = "") {
+            const staffPincode = localStorage.getItem("assigned_pincode") || "64109";
+            let url = `/api/admin/district-users?staff_pincode=${encodeURIComponent(staffPincode)}`;
+            
+            if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+            if (exactPincode) url += `&exact_pincode=${encodeURIComponent(exactPincode)}`;
+
+            const tbody = document.getElementById("householdProfilesTbody");
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.detail || "Failed to fetch users");
+
+                document.getElementById("profilesCountBadge").textContent = `${data.count || 0} found`;
+                tbody.innerHTML = "";
+
+                if (!data.profiles || data.profiles.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="py-12 text-center text-slate-500">
+                                <i class="fa-solid fa-folder-open text-3xl mb-2 opacity-40"></i>
+                                <p class="text-xs font-medium">No household profiles match your query in this district prefix.</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                for (const profile of data.profiles) {
+                    // Fetch pending waste entries for each profile
+                    const pendingRes = await fetch(`/api/admin/user-pending-entries/${profile.id}`);
+                    const pendingData = await pendingRes.json();
+                    const pendingEntries = pendingData.entries || [];
+
+                    // 1. Primary Household Profile Row
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-800/40 transition cursor-pointer group";
+                    tr.onclick = () => toggleDropdown(`dropdown-user-${profile.id}`);
+
+                    tr.innerHTML = `
+                        <td class="py-4 px-6 font-mono text-slate-400 text-xs">#${profile.id}</td>
+                        <td class="py-4 px-6 font-semibold text-white group-hover:text-amber-400 transition">${escapeHtml(profile.full_name)}</td>
+                        <td class="py-4 px-6 text-slate-300">${escapeHtml(profile.email)}</td>
+                        <td class="py-4 px-6">
+                            <span class="bg-slate-800 border border-slate-700/80 px-2.5 py-1 rounded-md font-mono text-xs text-amber-400">
+                                ${escapeHtml(profile.postal_code)}
+                            </span>
+                        </td>
+                        <td class="py-4 px-6 text-slate-300 capitalize">${escapeHtml(profile.premise_type || 'House')}</td>
+                        <td class="py-4 px-6 font-mono text-xs text-slate-400">${escapeHtml(profile.upi_id || 'N/A')}</td>
+                        <td class="py-4 px-6 text-right">
+                            <button class="inline-flex items-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl font-bold text-xs transition">
+                                <span>Pending Requests</span>
+                                <span class="bg-amber-500 text-slate-950 font-extrabold rounded-full px-2 py-0.5 text-[10px]">
+                                    ${pendingEntries.length}
+                                </span>
+                                <i class="fa-solid fa-chevron-down text-[10px] ml-1 transition-transform group-aria-expanded:rotate-180"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    // 2. Expandable Accordion Dropdown Sub-Table
+                    const dropdownTr = document.createElement("tr");
+                    dropdownTr.id = `dropdown-user-${profile.id}`;
+                    dropdownTr.className = "accordion-content hidden bg-slate-950/80 border-b border-slate-800/80";
+
+                    let subTableHtml = `
+                        <td colspan="7" class="p-4 sm:p-6">
+                            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-inner">
+                                <div class="flex items-center justify-between mb-3 px-1">
+                                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                        <i class="fa-solid fa-box-archive text-amber-400"></i>
+                                        Pending Recycling Requests for Household #${profile.id}
+                                    </h3>
+                                    <span class="text-[11px] text-slate-500">Requires district officer verification</span>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr class="bg-slate-950/60 text-slate-400 border-b border-slate-800 uppercase font-semibold">
+                                                <th class="py-2.5 px-4">Trash ID</th>
+                                                <th class="py-2.5 px-4">Trash Category</th>
+                                                <th class="py-2.5 px-4">Weight (in KG)</th>
+                                                <th class="py-2.5 px-4">Estimated Payout Amount</th>
+                                                <th class="py-2.5 px-4 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-800/60">
+                    `;
+
+                    if (pendingEntries.length === 0) {
+                        subTableHtml += `
+                            <tr>
+                                <td colspan="5" class="py-6 text-center text-slate-500 italic">
+                                    No pending recycling entries queued for review.
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        pendingEntries.forEach(entry => {
+                            subTableHtml += `
+                                <tr class="hover:bg-slate-800/30 transition">
+                                    <td class="py-3 px-4 font-mono text-slate-400">#TRASH-${entry.entry_id}</td>
+                                    <td class="py-3 px-4 font-semibold text-white capitalize">${escapeHtml(entry.waste_category)}</td>
+                                    <td class="py-3 px-4 font-mono text-slate-300">${entry.weight_kg.toFixed(2)} kg</td>
+                                    <td class="py-3 px-4 font-bold text-emerald-400">₹${entry.payout_amount.toFixed(2)}</td>
+                                    <td class="py-3 px-4 text-right">
+                                        <div class="inline-flex items-center gap-2">
+                                            <button onclick="reviewRecyclingEntry(event, ${entry.entry_id}, 'approve')" class="bg-lime-500 hover:bg-lime-400 text-slate-950 font-extrabold px-3.5 py-1.5 rounded-lg shadow-md shadow-lime-500/10 transition text-[11px] tracking-wide uppercase">
+                                                Approve
+                                            </button>
+                                            <button onclick="reviewRecyclingEntry(event, ${entry.entry_id}, 'decline')" class="bg-red-600 hover:bg-red-500 text-white font-extrabold px-3.5 py-1.5 rounded-lg shadow-md shadow-red-600/10 transition text-[11px] tracking-wide uppercase">
+                                                Decline
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    }
+
+                    subTableHtml += `
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                    dropdownTr.innerHTML = subTableHtml;
+                    tbody.appendChild(dropdownTr);
+                }
+            } catch (error) {
+                console.error("Data loading error:", error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-rose-400 text-xs">
+                            Failed to load district profiles. Please verify database connection.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function toggleDropdown(rowId) {
+            const dropdownRow = document.getElementById(rowId);
+            if (dropdownRow) {
+                dropdownRow.classList.toggle("hidden");
+            }
+        }
+
+        async function reviewRecyclingEntry(event, entryId, action) {
+            event.stopPropagation();
+            
+            const staffId = localStorage.getItem("staff_id");
+            let rejectionReason = null;
+
+            if (action === "decline") {
+                rejectionReason = prompt("Please provide a reason for declining this drop-off entry:") || "Declined by District Officer";
+            }
+
+            try {
+                const response = await fetch(`/api/staff/entries/${entryId}/review`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        action: action,
+                        rejection_reason: rejectionReason,
+                        staff_id: staffId ? parseInt(staffId) : null
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.status === "success") {
+                    // Re-render and refresh database state instantly
+                    const searchVal = document.getElementById("searchInput").value;
+                    const pinVal = document.getElementById("pincodeInput").value;
+                    fetchDistrictData(searchVal, pinVal);
+                } else {
+                    alert(result.detail || "Unable to update recycling entry.");
+                }
+            } catch (err) {
+                console.error("Entry review error:", err);
+                alert("A system error occurred while updating the database.");
+            }
+        }
+
+        function handleFilterSubmit(event) {
+            event.preventDefault();
+            const searchVal = document.getElementById("searchInput").value.trim();
+            const pinVal = document.getElementById("pincodeInput").value.trim();
+            fetchDistrictData(searchVal, pinVal);
+        }
+
+        function resetFilters() {
+            document.getElementById("searchInput").value = "";
+            document.getElementById("pincodeInput").value = "";
+            fetchDistrictData();
+        }
+
+        function logoutStaff() {
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.href = "/staff-login";
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
 </body>
 </html>

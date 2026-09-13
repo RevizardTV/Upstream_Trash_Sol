@@ -369,30 +369,6 @@ async def review_user_profile(
     db.commit()
     return {"status": "success", "message": f"User profile status updated to {data.action}"}
 
-@app.post("/api/staff/entries/{entry_id}/review")
-async def review_recycling_entry(
-    entry_id: int, 
-    data: EntryReviewSchema, 
-    db: Session = Depends(get_db)
-):
-    print("REVIEW ENACTED")
-    entry = db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Recycling entry not found.")
-
-    # Update database attributes
-    new_status = "approved" if data.action == "approve" else "declined"
-    print("REVIEW STATUS SET")
-    db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).update({
-        "status": new_status,
-        "reviewed_by_staff_id": data.staff_id,
-        "rejection_reason": data.rejection_reason if data.action == "decline" else None
-    }, synchronize_session="fetch")
-
-    # Persist changes to database
-    db.commit()
-    
-    return {"status": "success", "message": f"Entry #{entry_id} updated to {new_status}."}
 
 
 # --- Recycling & Waste Transactions ---
@@ -645,3 +621,51 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
             status_code=400, 
             detail=f"Unknown table parameter '{table}'."
         )
+        
+# --- GET Household Pending Trash Entries for Staff Review ---
+@app.get("/api/admin/user-pending-entries/{user_id}")
+async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
+    entries = db.query(RecyclingEntry).filter(
+        RecyclingEntry.user_id == user_id,
+        RecyclingEntry.status == "pending"
+    ).all()
+    
+    return {
+        "status": "success",
+        "user_id": user_id,
+        "count": len(entries),
+        "entries": [
+            {
+                "entry_id": e.entry_id,
+                "waste_category": e.waste_category,
+                "weight_kg": float(e.weight_kg),
+                "payout_amount": float(e.payout_amount),
+                "created_at": e.created_at.isoformat() if e.created_at else None
+            }
+            for e in entries
+        ]
+    }
+
+# --- REVIEW (Approve / Decline) Waste Entry ---
+@app.post("/api/staff/entries/{entry_id}/review")
+async def review_recycling_entry(
+    entry_id: int, 
+    data: EntryReviewSchema, 
+    db: Session = Depends(get_db)
+):
+    entry = db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Recycling entry not found.")
+
+    new_status = "approved" if data.action == "approve" else "declined"
+    
+    # Directly update database state
+    entry.status = new_status
+    entry.reviewed_by_staff_id = data.staff_id
+    if data.action == "decline":
+        entry.rejection_reason = data.rejection_reason or "Declined by district officer"
+        
+    db.commit()
+    db.refresh(entry)
+    
+    return {"status": "success", "message": f"Entry #{entry_id} successfully updated to {new_status}."}
