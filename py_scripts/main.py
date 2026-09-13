@@ -13,7 +13,7 @@ from py_scripts.debug import router as debug_router
 
 # Database Imports
 from sqlalchemy.orm import Session
-from py_scripts.database import Base, UserProfile, RecyclingEntry, engine, get_db
+from py_scripts.database import Base, UserProfile, RecyclingEntry,StaffProfile, engine, get_db
 
 from py_scripts.config import config
 from py_scripts.emailSend import send_email
@@ -388,4 +388,64 @@ async def get_user_recycling_summary(
             }
             for e in entries
         ]
+    }
+    
+    from pydantic import BaseModel
+from hashlib import sha256
+
+# Pydantic Schemas for Staff Authorization
+class StaffRegisterSchema(BaseModel):
+    email: EmailStr
+    full_name: str
+    assigned_pincode: str
+    password: str
+
+class StaffLoginSchema(BaseModel):
+    email: EmailStr
+    password: str
+
+# Serve Staff HTML Pages
+@app.get("/register-staff")
+async def serve_register_staff():
+    return FileResponse("webpages/register_staff.html")
+
+@app.get("/staff-login")
+async def serve_staff_login():
+    return FileResponse("webpages/staff_login.html")
+
+# Staff Authentication API Endpoints
+@app.post("/api/staff/register")
+async def register_staff_account(data: StaffRegisterSchema, db: Session = Depends(get_db)):
+    existing = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Staff account with this email already exists.")
+    
+    hashed_password = sha256(data.password.encode()).hexdigest()
+    new_staff = StaffProfile(
+        email=data.email,
+        full_name=data.full_name,
+        assigned_pincode=data.assigned_pincode,
+        password_hash=hashed_password
+    )
+    db.add(new_staff)
+    db.commit()
+    db.refresh(new_staff)
+    return {"status": "success", "message": "Staff registered successfully!", "staff_id": new_staff.id}
+
+@app.post("/api/staff/login")
+async def login_staff_account(data: StaffLoginSchema, db: Session = Depends(get_db)):
+    hashed_password = sha256(data.password.encode()).hexdigest()
+    staff = db.query(StaffProfile).filter(
+        StaffProfile.email == data.email, 
+        StaffProfile.password_hash == hashed_password
+    ).first()
+    
+    if not staff:
+        raise HTTPException(status_code=401, detail="Invalid staff credentials.")
+        
+    return {
+        "status": "success", 
+        "staff_id": staff.id, 
+        "email": staff.email, 
+        "assigned_pincode": staff.assigned_pincode
     }

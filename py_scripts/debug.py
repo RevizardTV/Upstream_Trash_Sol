@@ -94,3 +94,53 @@ async def wipe_database(db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to wipe database: {str(e)}"
         )
+        
+@router.get("/district-users")
+async def get_district_users(
+    staff_pincode: str = Query(...),
+    search: str = Query(None), # Optional search term for name or email
+    exact_pincode: str = Query(None), # Optional filter for exact 6-digit PIN
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch all users within the staff member's sorting district (matching first 3 digits of PIN).
+    Allows searching by user name, email, or exact locality pincode.
+    """
+    if len(staff_pincode) < 3:
+        raise HTTPException(status_code=400, detail="Staff pincode must be at least 3 digits.")
+
+    district_prefix = staff_pincode[:3]
+    query = db.query(UserProfile).filter(UserProfile.postal_code.like(f"{district_prefix}%"))
+
+    # Apply search filter if provided (matches user name or email)
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            (UserProfile.full_name.ilike(search_filter)) | 
+            (UserProfile.email.ilike(search_filter))
+        )
+
+    # Apply exact pincode filter if provided
+    if exact_pincode:
+        query = query.filter(UserProfile.postal_code == exact_pincode)
+
+    profiles = query.all()
+
+    return {
+        "status": "success",
+        "district_prefix": district_prefix,
+        "count": len(profiles),
+        "profiles": [
+            {
+                "id": p.id,
+                "full_name": p.full_name,
+                "email": p.email,
+                "phone_number": p.phone_number,
+                "city": p.city,
+                "postal_code": p.postal_code,
+                "premise_type": p.premise_type,
+                "household_size": p.household_size,
+                "upi_id": p.upi_id
+            } for p in profiles
+        ]
+    }
