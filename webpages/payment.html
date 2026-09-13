@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EcoRecycle - Payment Options</title>
+    <title>EcoRecycle - Payment Dashboard</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -13,10 +15,10 @@
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex">
 
-    <!-- Sidebar Navigation -->
+    <!-- Sidebar Section -->
     <aside class="w-72 bg-slate-800/50 border-r border-slate-700/60 p-6 flex flex-col justify-between hidden md:flex">
         <div>
-            <!-- Logo Header -->
+            <!-- App Logo -->
             <div class="flex items-center gap-3 mb-10 px-2">
                 <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-xl">
                     <i class="fa-solid fa-leaf"></i>
@@ -24,7 +26,20 @@
                 <span class="font-bold text-lg tracking-wide text-white">EcoRecycle</span>
             </div>
 
-            <!-- Navigation Links -->
+            <!-- Restored Profile Details Card -->
+            <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 text-center mb-8 relative shadow-lg">
+                <div class="relative w-20 h-20 mx-auto mb-3 flex items-center justify-center rounded-full bg-slate-700/80 border-2 border-slate-600 text-slate-400 text-3xl">
+                    <i class="fa-solid fa-user"></i>
+                    <span class="w-3.5 h-3.5 bg-emerald-500 border-2 border-slate-800 rounded-full absolute bottom-1 right-1" title="Online"></span>
+                </div>
+                <h3 id="profileName" class="font-bold text-white text-base tracking-wide">Loading...</h3>
+                <p id="profileEmail" class="text-xs text-slate-400 mt-0.5">...</p>
+                <div class="mt-3 inline-block bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-2.5 py-1 rounded-full font-medium">
+                    Verified Recycling Partner
+                </div>
+            </div>
+
+            <!-- Side Navigation -->
             <nav class="space-y-1.5">
                 <a href="/payment" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 font-medium text-sm border border-emerald-500/20">
                     <i class="fa-solid fa-wallet text-base"></i> Payment Options
@@ -47,59 +62,82 @@
         </button>
     </aside>
 
-    <!-- Main Workspace Area -->
+    <!-- Main Dashboard Area -->
     <main class="flex-1 p-6 md:p-10 overflow-y-auto">
-        
-        <!-- Header & Stats Overview -->
         <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-slate-800 pb-6">
             <div>
-                <h1 class="text-2xl md:text-3xl font-bold text-white tracking-tight">Payout Dashboard</h1>
-                <p class="text-slate-400 text-sm mt-1">Manage your registered payout methods and track incoming balance rewards.</p>
+                <h1 class="text-2xl md:text-3xl font-bold text-white tracking-tight">Payment Portal</h1>
+                <p class="text-slate-400 text-sm mt-1">Manage payout registrations, active transactions, and account details.</p>
             </div>
-            
-            <div class="flex items-center gap-4">
-                <div class="bg-slate-800 border border-slate-700/60 px-4 py-2 rounded-xl text-right">
-                    <span class="text-xs text-slate-400 block">Available Balance</span>
-                    <span id="userBalanceDisplay" class="font-bold text-emerald-400 text-lg">₹0.00</span>
-                </div>
+            <div class="flex items-center gap-3">
+                <span class="bg-slate-800 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700">
+                    <i class="fa-solid fa-shield-halved text-emerald-400 mr-1.5"></i> SSL Encrypted
+                </span>
             </div>
         </header>
 
-        <!-- Primary Payment Options Cards Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            
-            <!-- Card 1: Register Payout Details -->
-            <a href="/register-payment" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg flex flex-col justify-between">
+        <!-- Metrics Overview Section -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Earnings</p>
+                    <p id="totalEarnings" class="text-xl font-bold text-white mt-1">₹0.00</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                    <i class="fa-solid fa-indian-rupee-sign"></i>
+                </div>
+            </div>
+            <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Pending Release</p>
+                    <p id="pendingRelease" class="text-xl font-bold text-amber-400 mt-1">₹0.00</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                    <i class="fa-solid fa-clock text-amber-400"></i>
+                </div>
+            </div>
+            <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Eco Credits</p>
+                    <p id="ecoCredits" class="text-xl font-bold text-emerald-400 mt-1">0 pts</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Primary Options Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <a href="/register-payment" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between">
                 <div>
                     <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-credit-card"></i>
+                        <i class="fa-solid fa-plus-circle"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Payout Method</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">Update your bank details or direct UPI payment address to receive direct deposits.</p>
+                    <h3 class="text-xl font-bold text-white mb-2">Register Payment</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Add a new bank account, UPI ID, or digital wallet to receive payouts for recycled materials.</p>
                 </div>
                 <div class="mt-6 flex items-center gap-2 text-emerald-400 font-semibold text-sm">
-                    <span>Configure Now</span>
+                    <span>Configure Method</span>
                     <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
                 </div>
             </a>
 
-            <!-- Card 2: Pending Requests -->
-            <a href="/pending-payments" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg flex flex-col justify-between">
+            <a href="/pending-payments" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-amber-500/10 flex flex-col justify-between">
                 <div>
                     <div class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
                         <i class="fa-solid fa-hourglass-half"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Pending Requests</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">View submitted recycling transactions awaiting manual staff verification.</p>
+                    <h3 class="text-xl font-bold text-white mb-2">Pending Payments</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Review incoming transfers, pending verification approvals, and active transaction statuses.</p>
                 </div>
                 <div class="mt-6 flex items-center gap-2 text-amber-400 font-semibold text-sm">
-                    <span>View Pending Queue</span>
+                    <span id="pendingCardCount">View Queue</span>
                     <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
                 </div>
             </a>
 
-            <!-- Card 3: Reviewed Requests -->
-            <a href="/reviewed-requests" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg flex flex-col justify-between">
+            <a href="/reviewed-requests" class="group bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-6 transition-all duration-300 shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between">
                 <div>
                     <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
                         <i class="fa-solid fa-clipboard-check"></i>
@@ -112,29 +150,9 @@
                     <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
                 </div>
             </a>
-
         </div>
-
-        <!-- Direct Information Guide Section -->
-        <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6 md:p-8">
-            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <i class="fa-solid fa-shield-halved text-emerald-400"></i> Secure Payout Processing
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-slate-400">
-                <div class="space-y-2">
-                    <span class="font-semibold text-slate-200 block">Verification Window</span>
-                    <p>Submissions are reviewed by neighborhood verification agents within 24 to 48 business hours.</p>
-                </div>
-                <div class="space-y-2">
-                    <span class="font-semibold text-slate-200 block">Direct UPI Transfers</span>
-                    <p>Approved payouts will automatically transfer to your linked UPI address or registered bank account.</p>
-                </div>
-            </div>
-        </div>
-
     </main>
 
-    <!-- Client Script Links -->
     <script src="/static/js/payment.js"></script>
 </body>
 </html>

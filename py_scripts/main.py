@@ -379,14 +379,19 @@ async def review_recycling_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Recycling entry not found.")
 
-    entry.status = "approved" if data.action == "approve" else "declined"
-    if hasattr(entry, "reviewed_by_staff_id"):
-        entry.reviewed_by_staff_id = data.staff_id
-    if data.rejection_reason and hasattr(entry, "rejection_reason"):
-        entry.rejection_reason = data.rejection_reason
+    # Update database attributes
+    new_status = "approved" if data.action == "approve" else "declined"
+    
+    db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).update({
+        "status": new_status,
+        "reviewed_by_staff_id": data.staff_id,
+        "rejection_reason": data.rejection_reason if data.action == "decline" else None
+    }, synchronize_session="fetch")
 
+    # Persist changes to database
     db.commit()
-    return {"status": "success", "message": f"Entry #{entry_id} updated to {entry.status}."}
+    
+    return {"status": "success", "message": f"Entry #{entry_id} updated to {new_status}."}
 
 
 # --- Recycling & Waste Transactions ---
