@@ -12,7 +12,6 @@ import redis.asyncio as redis
 from resend.exceptions import ResendError
 
 # Database Imports
-
 from sqlalchemy.orm import Session
 from py_scripts.database import Base, UserProfile, RecyclingEntry, StaffProfile, engine, get_db
 
@@ -77,7 +76,8 @@ for folder in ["static", "image_assets", "webpages"]:
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# Pydantic Schemas
+# --- Pydantic Schemas ---
+
 class OTPRequest(BaseModel):
     email_address: EmailStr
 
@@ -93,7 +93,7 @@ class ProfileCreateSchema(BaseModel):
     postal_code: str
     premise_type: str = "house"
     household_size: int = 1
-    upi_id: str | None = None
+    upi_id: Optional[str] = None
 
 class RecyclingEntrySchema(BaseModel):
     user_id: int
@@ -114,8 +114,18 @@ class StaffLoginSchema(BaseModel):
     email: EmailStr
     password: str
 
+class StaffReviewSchema(BaseModel):
+    action: str  # "approve" or "decline"
+    rejection_reason: Optional[str] = None
 
-# Frontend Webpage Handlers
+class EntryReviewSchema(BaseModel):
+    action: str  # "approve" or "decline"
+    rejection_reason: Optional[str] = None
+    staff_id: Optional[int] = None
+
+
+# --- Frontend Webpage Handlers ---
+
 @app.get("/")
 async def serve_home():
     return FileResponse("webpages/index.html")
@@ -135,6 +145,10 @@ async def serve_register_payment():
 @app.get("/pending-payments")
 async def serve_pending_payments():
     return FileResponse("webpages/pending_payments.html")
+
+@app.get("/reviewed-requests")
+async def serve_reviewed_requests():
+    return FileResponse("webpages/reviewed_requests.html")
 
 @app.get("/payment-info")
 async def serve_payment_info():
@@ -157,7 +171,8 @@ async def serve_staff_dashboard():
     return FileResponse("webpages/staff_dashboard.html")
 
 
-# User Authentication Endpoints
+# --- User Authentication Endpoints ---
+
 @app.post("/api/auth/request-otp")
 async def request_otp(data: OTPRequest, request: Request):
     client_ip = request.headers.get("x-forwarded-for")
@@ -236,9 +251,8 @@ async def verify_otp_route(data: OTPVerify, request: Request):
 async def save_user_profile(data: ProfileCreateSchema, response: Response, db: Session = Depends(get_db)):
     user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
     
-    # Convert incoming Pydantic data to a dictionary and explicitly add profile_complete
     user_data = data.model_dump()
-    user_data["profile_complete"] = True
+    user_data["profile_complete"] = False  # Mark unreviewed by default
 
     if not user:
         user = UserProfile(**user_data)
@@ -262,7 +276,8 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
     return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
 
 
-# User Profile & Data Endpoints
+# --- User Profile & Data Endpoints ---
+
 @app.get("/api/user/profile")
 async def get_user_profile(user_id: int = Query(None), email: str = Query(None), db: Session = Depends(get_db)):
     if not user_id and not email:
@@ -288,12 +303,14 @@ async def get_user_profile(user_id: int = Query(None), email: str = Query(None),
             "postal_code": user.postal_code,
             "premise_type": user.premise_type,
             "household_size": user.household_size,
-            "upi_id": user.upi_id
+            "upi_id": user.upi_id,
+            "profile_complete": getattr(user, "profile_complete", False)
         }
     }
 
 
-# Staff Authorization Endpoints
+# --- Staff Authorization Endpoints ---
+
 @app.post("/api/staff/register")
 async def register_staff_account(data: StaffRegisterSchema, request: Request, db: Session = Depends(get_db)):
     client_ip = request.client.host if request.client else "127.0.0.1"
@@ -338,8 +355,42 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         "assigned_pincode": staff.assigned_pincode
     }
 
+@app.post("/api/staff/users/{user_id}/review")
+async def review_user_profile(
+    user_id: int, 
+    data: StaffReviewSchema, 
+    db: Session = Depends(get_db)
+):
+    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User ID #{user_id} not found.")
 
-# Recycling & Waste Transactions
+    user.profile_complete = True if data.action == "approve" else False
+    db.commit()
+    return {"status": "success", "message": f"User profile status updated to {data.action}"}
+
+@app.post("/api/staff/entries/{entry_id}/review")
+async def review_recycling_entry(
+    entry_id: int, 
+    data: EntryReviewSchema, 
+    db: Session = Depends(get_db)
+):
+    entry = db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Recycling entry not found.")
+
+    entry.status = "approved" if data.action == "approve" else "declined"
+    if hasattr(entry, "reviewed_by_staff_id"):
+        entry.reviewed_by_staff_id = data.staff_id
+    if data.rejection_reason and hasattr(entry, "rejection_reason"):
+        entry.rejection_reason = data.rejection_reason
+
+    db.commit()
+    return {"status": "success", "message": f"Entry #{entry_id} updated to {entry.status}."}
+
+
+# --- Recycling & Waste Transactions ---
+
 @app.post("/api/recycling/entry")
 async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(get_db)):
     try:
@@ -347,7 +398,13 @@ async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(
         if not user:
             raise HTTPException(status_code=404, detail=f"User ID {data.user_id} not found in user_profiles.")
             
-        new_entry = RecyclingEntry(**data.model_dump())
+        new_entry = RecyclingEntry(
+            user_id=data.user_id,
+            waste_category=data.waste_category,
+            weight_kg=data.weight_kg,
+            payout_amount=data.payout_amount,
+            status="pending"
+        )
         db.add(new_entry)
         db.commit()
         db.refresh(new_entry)
@@ -380,7 +437,11 @@ async def get_pending_payments(
             raise HTTPException(status_code=404, detail="User profile not found")
         user_id = user.id
 
-    entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).order_by(RecyclingEntry.entry_id.desc()).all()
+    entries = db.query(RecyclingEntry).filter(
+        RecyclingEntry.user_id == user_id,
+        RecyclingEntry.status == "pending"
+    ).order_by(RecyclingEntry.entry_id.desc()).all()
+    
     total_payout = sum(float(entry.payout_amount) for entry in entries)
 
     return {
@@ -394,9 +455,50 @@ async def get_pending_payments(
                 "waste_category": entry.waste_category,
                 "weight_kg": float(entry.weight_kg),
                 "payout_amount": float(entry.payout_amount),
-                "created_at": entry.created_at.isoformat() if entry.created_at else None
+                "created_at": entry.created_at.isoformat() if getattr(entry, "created_at", None) else None
             }
             for entry in entries
+        ]
+    }
+
+@app.get("/api/recycling/reviewed-requests")
+async def get_reviewed_requests(
+    user_id: int = Query(None), 
+    email: str = Query(None), 
+    db: Session = Depends(get_db)
+):
+    if not user_id and not email:
+        raise HTTPException(status_code=400, detail="Must provide user_id or email")
+    
+    if not user_id and email:
+        user = db.query(UserProfile).filter(UserProfile.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User profile not found")
+        user_id = user.id
+
+    entries = db.query(RecyclingEntry).filter(
+        RecyclingEntry.user_id == user_id,
+        RecyclingEntry.status.in_(["approved", "declined"])
+    ).order_by(RecyclingEntry.entry_id.desc()).all()
+
+    total_approved = sum(float(e.payout_amount) for e in entries if getattr(e, "status", None) == "approved")
+
+    return {
+        "status": "success",
+        "user_id": user_id,
+        "total_approved_earnings": total_approved,
+        "count": len(entries),
+        "entries": [
+            {
+                "entry_id": e.entry_id,
+                "waste_category": e.waste_category,
+                "weight_kg": float(e.weight_kg),
+                "payout_amount": float(e.payout_amount),
+                "status": getattr(e, "status", "approved"),
+                "rejection_reason": getattr(e, "rejection_reason", None),
+                "created_at": e.created_at.isoformat() if getattr(e, "created_at", None) else None
+            }
+            for e in entries
         ]
     }
 
@@ -414,6 +516,7 @@ async def get_user_recycling_summary(
 
     entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).all()
 
+    # Total Earnings only includes approved entries
     approved_total = sum(float(e.payout_amount) for e in entries if getattr(e, "status", "pending") == "approved")
     pending_total = sum(float(e.payout_amount) for e in entries if getattr(e, "status", "pending") == "pending")
     total_approved_weight = sum(float(e.weight_kg) for e in entries if getattr(e, "status", "pending") == "approved")
@@ -431,14 +534,15 @@ async def get_user_recycling_summary(
                 "payout_amount": float(e.payout_amount),
                 "status": getattr(e, "status", "pending"),
                 "rejection_reason": getattr(e, "rejection_reason", None),
-                "created_at": e.created_at.isoformat() if e.created_at else None
+                "created_at": e.created_at.isoformat() if getattr(e, "created_at", None) else None
             }
             for e in entries
         ]
     }
 
 
-# Staff District Inspection API
+# --- Staff District Inspection API ---
+
 @app.get("/api/admin/district-users")
 async def get_district_users(
     staff_pincode: str = Query(...),
@@ -450,7 +554,12 @@ async def get_district_users(
         raise HTTPException(status_code=400, detail="Staff pincode must be at least 3 digits.")
 
     district_prefix = staff_pincode[:3]
-    query = db.query(UserProfile).filter(UserProfile.postal_code.like(f"{district_prefix}%"))
+    
+    # Exclude already completed/approved users
+    query = db.query(UserProfile).filter(
+        UserProfile.postal_code.like(f"{district_prefix}%"),
+        UserProfile.profile_complete == False
+    )
 
     if search:
         search_filter = f"%{search}%"
@@ -484,7 +593,8 @@ async def get_district_users(
     }
 
 
-# Admin Data Inspection Utility
+# --- Admin Utility Endpoint ---
+
 @app.get("/api/admin/show-data")
 async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
     table_lower = table.lower()
@@ -502,7 +612,8 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
                 "premise_type": p.premise_type,
                 "household_size": p.household_size,
                 "upi_id": p.upi_id,
-                "created_at": p.created_at.isoformat() if p.created_at else None
+                "profile_complete": getattr(p, "profile_complete", False),
+                "created_at": p.created_at.isoformat() if getattr(p, "created_at", None) else None
             }
             for p in records
         ]
@@ -517,7 +628,7 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
                 "waste_category": r.waste_category,
                 "weight_kg": r.weight_kg,
                 "payout_amount": r.payout_amount,
-                "entry_type": getattr(r, "entry_type", "payout")
+                "status": getattr(r, "status", "pending")
             }
             for r in records
         ]
@@ -528,27 +639,3 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
             status_code=400, 
             detail=f"Unknown table parameter '{table}'."
         )
-        
-# Add to Pydantic Schemas section in main_5.py
-class StaffReviewSchema(BaseModel):
-    action: str  # "approve" or "decline"
-    rejection_reason: Optional[str] = None
-
-# Add to Staff Authorization Endpoints section in main_5.py
-@app.post("/api/staff/users/{user_id}/review")
-async def review_user_profile(
-    user_id: int, 
-    data: StaffReviewSchema, 
-    db: Session = Depends(get_db)
-):
-    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail=f"User ID #{user_id} not found.")
-
-    if data.action == "approve":
-        user.profile_complete = True
-    elif data.action == "decline":
-        user.profile_complete = False
-
-    db.commit()
-    return {"status": "success", "message": f"User profile status updated to {data.action}"}
