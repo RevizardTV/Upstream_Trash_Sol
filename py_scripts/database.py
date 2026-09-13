@@ -44,40 +44,52 @@ class Base(DeclarativeBase):
 class StaffProfile(Base):
     __tablename__ = "staff_profiles"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     assigned_pincode: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    
+    # Dual default prevents MySQL 1364 if DB column lacks DEFAULT expression
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    reviewed_entries: Mapped[List["RecyclingEntry"]] = relationship(
+        "RecyclingEntry", back_populates="reviewed_by_staff"
+    )
 
 
 class UserProfile(Base):
     __tablename__ = "user_profiles"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone_number: Mapped[str] = mapped_column(String(50), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=False)
     postal_code: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
-    premise_type: Mapped[str] = mapped_column(String(50), default="house", server_default="house")
-    household_size: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    premise_type: Mapped[str] = mapped_column(String(50), default="house", server_default="house", nullable=False)
+    household_size: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     upi_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     
-    # Prevents MySQL 1364 default value error
-    profile_complete: Mapped[bool] = mapped_column(default=True, server_default="1")
-    
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Explicit defaults for MySQL compatibility
+    profile_complete: Mapped[bool] = mapped_column(default=True, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), server_default=func.now(), nullable=False
+    )
 
-    # Option 2: Property named 'recycling_entries' matched in RecyclingEntry.user
-    recycling_entries: Mapped[List["RecyclingEntry"]] = relationship("RecyclingEntry", back_populates="user")
+    # Bidirectional Relationship (Option 2 aligned)
+    recycling_entries: Mapped[List["RecyclingEntry"]] = relationship(
+        "RecyclingEntry", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class RecyclingEntry(Base):
     __tablename__ = "recycling_entries"
 
-    entry_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
+    entry_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user_profiles.id", ondelete="CASCADE"), nullable=False)
     waste_category: Mapped[str] = mapped_column(String(100), nullable=False)
     weight_kg: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
@@ -86,6 +98,7 @@ class RecyclingEntry(Base):
     status: Mapped[str] = mapped_column(
         Enum("pending", "approved", "declined", name="status_enum"),
         default="pending",
+        server_default="pending",
         nullable=False,
     )
     rejection_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -93,13 +106,18 @@ class RecyclingEntry(Base):
         ForeignKey("staff_profiles.id", ondelete="SET NULL"), nullable=True
     )
     
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), server_default=func.now(), nullable=False
+    )
 
-    # Option 2 applied: 'back_populates' aligned with UserProfile.recycling_entries
+    # Relationships
     user: Mapped["UserProfile"] = relationship("UserProfile", back_populates="recycling_entries")
+    reviewed_by_staff: Mapped[Optional["StaffProfile"]] = relationship(
+        "StaffProfile", back_populates="reviewed_entries"
+    )
 
 
-# 5. FastAPI Database Dependency
+# 5. Database Dependency
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
@@ -108,7 +126,7 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-# 6. Test & Table Initialization Script
+# 6. Connection Test & Initialization
 def test_connection():
     try:
         with engine.connect() as connection:
