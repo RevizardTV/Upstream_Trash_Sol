@@ -43,14 +43,14 @@ window.showTip = function(category) {
     }
 };
 
-// --- DATA LOADERS FOR EACH VIEW ---
+// --- API DATA LOADERS ---
 
-// 1. Profile & Dashboard Summary
+// 1. Profile & Dashboard Summary Retrieval API
 async function loadDashboardMetrics() {
     const param = getAuthParam();
     if (!param) return;
 
-    // Fetch Profile Name
+    // Fetch Profile Name & Email
     try {
         const profileRes = await fetch(`/api/user/profile?${param}`);
         if (profileRes.ok) {
@@ -90,7 +90,7 @@ async function loadDashboardMetrics() {
     }
 }
 
-// 2. Pending Queue Data Fetcher
+// 2. Pending Queue Data Fetcher API
 async function loadPendingPayments() {
     const param = getAuthParam();
     if (!param) return;
@@ -150,7 +150,7 @@ async function loadPendingPayments() {
     }
 }
 
-// 3. Reviewed Requests Data Fetcher
+// 3. Reviewed Requests Data Fetcher API
 async function loadReviewedRequests() {
     const param = getAuthParam();
     if (!param) return;
@@ -225,8 +225,8 @@ window.switchTab = function(targetViewId) {
 
 // --- FORM CALCULATOR & EVENT INITIALIZATION ---
 document.addEventListener("DOMContentLoaded", () => {
-    // Initialize Dashboard Data
-    loadDashboardMetrics();
+    // Initialize default view state and load metrics
+    switchTab('view-options');
 
     // Attach Sidebar Navigation Events
     document.querySelectorAll('#spaNav .nav-btn').forEach(btn => {
@@ -238,6 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Form Elements Initialization
     const weightInput = document.getElementById("weightInput");
+    const stationInput = document.getElementById("stationInput");
     const radios = document.querySelectorAll('input[name="material"]');
     const estDisplay = document.getElementById("estimatedTotal");
     const form = document.getElementById("paymentRegisterForm");
@@ -262,7 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (weightInput) weightInput.addEventListener("input", calculate);
     radios.forEach(r => r.addEventListener("change", calculate));
 
-    // Register Form Handling
+    // Register Form Handling & Direct Database Submission
     if (form) {
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
@@ -278,6 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const rate = parseFloat(selected.dataset.rate);
             const payout = rate * weight;
             const wasteCategory = selected.dataset.category || selected.value || "Plastic";
+            const accountSelect = form.querySelector("select");
 
             let userId = localStorage.getItem("user_id");
 
@@ -304,11 +306,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
+            // Payload constructed with Station ID and Target Payout Account
             const payload = {
                 user_id: parseInt(userId),
                 waste_category: wasteCategory,
                 weight_kg: weight,
-                payout_amount: payout
+                payout_amount: payout,
+                station_id: stationInput ? stationInput.value.trim() : null,
+                payout_method: accountSelect ? accountSelect.value : "upi"
             };
 
             try {
@@ -324,7 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     alert(`Drop-off recorded successfully! Entry ID: #${result.entry_id}`);
                     form.reset();
                     calculate();
-                    switchTab('view-pending'); // Automatically redirect to queue on submit
+                    switchTab('view-pending'); // Automatically switch to Pending Queue on success
                 } else {
                     alert(`Submission error: ${result.detail || 'Unknown error'}`);
                 }
