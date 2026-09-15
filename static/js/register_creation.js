@@ -1,3 +1,18 @@
+function startOtpTimer(timerElementId, buttonElementId, onExpire) {
+    let duration = 60;
+    const timerText = document.getElementById(timerElementId);
+    const interval = setInterval(() => {
+        if (duration <= 0) {
+            clearInterval(interval);
+            if (onExpire) onExpire();
+        } else {
+            if (timerText) timerText.textContent = `Expires in ${duration}s | Max 3 Attempts Allowed`;
+            duration--;
+        }
+    }, 1000);
+    return interval;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("profileForm");
     if (!form) return;
