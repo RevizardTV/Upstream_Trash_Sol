@@ -5,7 +5,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let timerInterval = null;
     let authSessionData = null;
 
-    // Dynamically inject OTP verification container
     let otpSection = document.getElementById("staffOtpSection");
     if (!otpSection) {
         otpSection = document.createElement("div");
@@ -28,7 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const submitBtn = document.getElementById("staffLoginSubmitBtn");
 
-    // Start 60-second countdown
     function startTimer() {
         let timeLeft = 60;
         const timerDisplay = document.getElementById("staffLoginTimerText");
@@ -71,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
             submitBtn.disabled = true;
             submitBtn.textContent = "Verifying Credentials...";
 
-            // 1. Verify credentials against staff login endpoint
             const loginRes = await fetch("/api/staff/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -88,7 +85,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             authSessionData = loginData;
 
-            // 2. Dispatch OTP email
             submitBtn.textContent = "Sending Verification Email...";
             const otpRes = await fetch("/api/auth/request-otp", {
                 method: "POST",

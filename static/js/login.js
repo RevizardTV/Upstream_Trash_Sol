@@ -1,4 +1,4 @@
-const API_URL = "/api/auth"; // Point directly to your FastAPI relative route
+const API_URL = "/api/auth";
 const otpTimer = document.getElementById("otpTimer");
 let otpIntervalId = null;
 
@@ -28,7 +28,7 @@ const ViewManager = {
         if (state.step === 'otp') {
             if (emailForm) emailForm.style.display = 'none';
             if (otpForm) otpForm.style.display = 'block';
-            startCountdownTimer(60); // 60 seconds matching EXPIRY in login.py
+            startCountdownTimer(60);
         } else {
             if (emailForm) emailForm.style.display = 'block';
             if (otpForm) otpForm.style.display = 'none';
