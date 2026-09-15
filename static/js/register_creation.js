@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (saveRes.ok) {
                 localStorage.setItem("user_id", saveData.user_id);
                 alert("Email verified and profile created successfully!");
-                window.location.href = "/payment";
+                window.location.href = "/login";
             } else {
                 alert("Profile saving failed: " + (saveData.detail || "Unknown error"));
             }
