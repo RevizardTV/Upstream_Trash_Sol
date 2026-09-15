@@ -2,6 +2,7 @@ from hashlib import sha256
 import json
 import os
 import sys
+import uuid
 from typing import Optional
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,6 +52,17 @@ app = FastAPI(title="EcoRecycle API")
 # Register Performance & Route Timing Middleware
 app.add_middleware(PerformanceLoggingMiddleware)
 
+# --- Security Anti-Caching Middleware ---
+# Prevents browser back-button navigation to authenticated pages after leaving/logout
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith(("/payment", "/staff-dashboard", "/pending-payments", "/reviewed-requests", "/payment-info", "/api")):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 # CORS Middleware Configuration
 origins = [
     "https://upstream-trash-sol.onrender.com",
@@ -76,6 +88,25 @@ for folder in ["static", "image_assets", "webpages"]:
     os.makedirs(folder, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+# --- Helper Session Helpers ---
+
+SESSION_EXPIRE_SECONDS = 3600  # 1 hour active session lifetime
+
+async def verify_user_session(session_authenticated: Optional[str]) -> bool:
+    if not session_authenticated:
+        return False
+    # Validate session token in Redis
+    exists = await redis_client.exists(f"session:{session_authenticated}")
+    return bool(exists)
+
+async def verify_staff_session(staff_authenticated: Optional[str]) -> bool:
+    if not staff_authenticated:
+        return False
+    # Validate staff session token in Redis
+    exists = await redis_client.exists(f"staff_session:{staff_authenticated}")
+    return bool(exists)
 
 
 # --- Pydantic Schemas ---
@@ -138,7 +169,7 @@ async def serve_login():
 
 @app.get("/payment")
 async def serve_payment(session_authenticated: Optional[str] = Cookie(None)):
-    if session_authenticated != "true":
+    if not await verify_user_session(session_authenticated):
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/payment.html")
 
@@ -148,19 +179,19 @@ async def serve_register_payment():
 
 @app.get("/pending-payments")
 async def serve_pending_payments(session_authenticated: Optional[str] = Cookie(None)):
-    if session_authenticated != "true":
+    if not await verify_user_session(session_authenticated):
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/pending_payments.html")
 
 @app.get("/reviewed-requests")
 async def serve_reviewed_requests(session_authenticated: Optional[str] = Cookie(None)):
-    if session_authenticated != "true":
+    if not await verify_user_session(session_authenticated):
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/reviewed_requests.html")
 
 @app.get("/payment-info")
 async def serve_payment_info(session_authenticated: Optional[str] = Cookie(None)):
-    if session_authenticated != "true":
+    if not await verify_user_session(session_authenticated):
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/payment_info.html")
 
@@ -178,20 +209,28 @@ async def serve_staff_login():
 
 @app.get("/staff-dashboard")
 async def serve_staff_dashboard(staff_authenticated: Optional[str] = Cookie(None)):
-    if staff_authenticated != "true":
+    if not await verify_staff_session(staff_authenticated):
         return RedirectResponse(url="/staff-login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/staff_dashboard.html")
 
 @app.get("/logout")
-async def logout():
+async def logout(session_authenticated: Optional[str] = Cookie(None)):
+    if session_authenticated:
+        # Revoke session in Redis
+        await redis_client.delete(f"session:{session_authenticated}")
+    
     response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-    response.delete_cookie(key="session_authenticated", path="/")
+    response.delete_cookie(key="session_authenticated", path="/", samesite="lax")
     return response
 
 @app.get("/staff-logout")
-async def staff_logout():
+async def staff_logout(staff_authenticated: Optional[str] = Cookie(None)):
+    if staff_authenticated:
+        # Revoke staff session in Redis
+        await redis_client.delete(f"staff_session:{staff_authenticated}")
+        
     response = RedirectResponse(url="/staff-login", status_code=status.HTTP_303_SEE_OTHER)
-    response.delete_cookie(key="staff_authenticated", path="/")
+    response.delete_cookie(key="staff_authenticated", path="/", samesite="lax")
     return response
 
 
@@ -250,13 +289,18 @@ async def verify_otp_route(data: OTPVerify, request: Request):
             )
             
         log_auth_event("OTP_VERIFY", data.email_address, "SUCCESS", client_ip, "Session cookie granted")
+        
+        # Generate cryptographically secure session token and save to Redis
+        session_token = str(uuid.uuid4())
+        await redis_client.setex(f"session:{session_token}", SESSION_EXPIRE_SECONDS, data.email_address)
+
         response = JSONResponse(
             content={"status": "success", "message": "OTP verified successfully."}
         )
         response.set_cookie(
             key="session_authenticated",
-            value="true",
-            httponly=False,
+            value=session_token,
+            httponly=True,
             samesite="lax",
             path="/"
         )
@@ -290,10 +334,14 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
     db.commit()
     db.refresh(user)
 
+    # Refresh active user session token
+    session_token = str(uuid.uuid4())
+    await redis_client.setex(f"session:{session_token}", SESSION_EXPIRE_SECONDS, user.email)
+
     response.set_cookie(
         key="session_authenticated",
-        value="true",
-        httponly=False,
+        value=session_token,
+        httponly=True,
         samesite="lax",
         path="/"
     )
@@ -303,7 +351,15 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
 # --- User Profile & Data Endpoints ---
 
 @app.get("/api/user/profile")
-async def get_user_profile(user_id: int = Query(None), email: str = Query(None), db: Session = Depends(get_db)):
+async def get_user_profile(
+    user_id: int = Query(None), 
+    email: str = Query(None), 
+    session_authenticated: Optional[str] = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    if not await verify_user_session(session_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized access. Please log in.")
+
     if not user_id and not email:
         raise HTTPException(status_code=400, detail="Must provide user_id or email query parameter")
     
@@ -373,22 +429,30 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         
     log_auth_event("STAFF_LOGIN", data.email, "SUCCESS", client_ip, f"Staff ID: {staff.id}")
     
+    # Store dynamic staff session in Redis
+    staff_token = str(uuid.uuid4())
+    await redis_client.setex(f"staff_session:{staff_token}", SESSION_EXPIRE_SECONDS, staff.email)
+
     response = JSONResponse(content={
         "status": "success", 
         "staff_id": staff.id, 
         "email": staff.email, 
         "assigned_pincode": staff.assigned_pincode
     })
-    # Set ONLY staff cookie
-    response.set_cookie(key="staff_authenticated", value="true", httponly=False, samesite="lax", path="/")
+    
+    response.set_cookie(key="staff_authenticated", value=staff_token, httponly=True, samesite="lax", path="/")
     return response
 
 @app.post("/api/staff/users/{user_id}/review")
 async def review_user_profile(
     user_id: int, 
     data: StaffReviewSchema, 
+    staff_authenticated: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    if not await verify_staff_session(staff_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized staff access.")
+
     user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail=f"User ID #{user_id} not found.")
@@ -401,7 +465,14 @@ async def review_user_profile(
 # --- Recycling & Waste Transactions ---
 
 @app.post("/api/recycling/entry")
-async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(get_db)):
+async def add_recycling_entry(
+    data: RecyclingEntrySchema, 
+    session_authenticated: Optional[str] = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    if not await verify_user_session(session_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized access.")
+
     try:
         user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
         if not user:
@@ -435,8 +506,12 @@ async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(
 async def get_pending_payments(
     user_id: int = Query(None), 
     email: str = Query(None), 
+    session_authenticated: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    if not await verify_user_session(session_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized access.")
+
     if not user_id and not email:
         raise HTTPException(status_code=400, detail="Must provide user_id or email")
     
@@ -474,8 +549,12 @@ async def get_pending_payments(
 async def get_reviewed_requests(
     user_id: int = Query(None), 
     email: str = Query(None), 
+    session_authenticated: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    if not await verify_user_session(session_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized access.")
+
     if not user_id and not email:
         raise HTTPException(status_code=400, detail="Must provide user_id or email")
     
@@ -515,8 +594,12 @@ async def get_reviewed_requests(
 async def get_user_recycling_summary(
     user_id: int = Query(None), 
     email: str = Query(None), 
+    session_authenticated: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    if not await verify_user_session(session_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized access.")
+
     if not user_id and email:
         user = db.query(UserProfile).filter(UserProfile.email == email).first()
         if not user:
@@ -557,8 +640,12 @@ async def get_district_users(
     staff_pincode: str = Query(...),
     search: str = Query(None),
     exact_pincode: str = Query(None),
+    staff_authenticated: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    if not await verify_staff_session(staff_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized staff access.")
+
     if len(staff_pincode) < 3:
         raise HTTPException(status_code=400, detail="Staff pincode must be at least 3 digits.")
 
@@ -605,7 +692,14 @@ async def get_district_users(
 # --- Admin Utility Endpoint ---
 
 @app.get("/api/admin/show-data")
-async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
+async def show_data(
+    table: str = Query(...), 
+    staff_authenticated: Optional[str] = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    if not await verify_staff_session(staff_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized admin access.")
+
     table_lower = table.lower()
     
     if table_lower in ["profile", "profiles", "user_profiles"]:
@@ -651,7 +745,14 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
         
 # --- GET Household Pending Trash Entries for Staff Review ---
 @app.get("/api/admin/user-pending-entries/{user_id}")
-async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
+async def get_user_pending_entries(
+    user_id: int, 
+    staff_authenticated: Optional[str] = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    if not await verify_staff_session(staff_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized staff access.")
+
     entries = db.query(RecyclingEntry).filter(
         RecyclingEntry.user_id == user_id,
         RecyclingEntry.status == "pending"
@@ -674,7 +775,13 @@ async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
     }
 
 @app.get("/api/recycling/receipt/{entry_id}")
-async def download_receipt(entry_id: int):
+async def download_receipt(
+    entry_id: int,
+    session_authenticated: Optional[str] = Cookie(None)
+):
+    if not await verify_user_session(session_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized access.")
+
     mock_entry = {
         "entry_id": entry_id,
         "waste_category": "plastic",
@@ -704,8 +811,12 @@ async def download_receipt(entry_id: int):
 async def review_recycling_entry(
     entry_id: int, 
     data: EntryReviewSchema, 
+    staff_authenticated: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    if not await verify_staff_session(staff_authenticated):
+        raise HTTPException(status_code=401, detail="Unauthorized staff access.")
+
     entry = db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Recycling entry not found.")
