@@ -3,13 +3,14 @@ import json
 import os
 import sys
 from typing import Optional
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr
 import redis.asyncio as redis
 from resend.exceptions import ResendError
+import io
 
 # Database Imports
 from sqlalchemy.orm import Session
@@ -20,10 +21,8 @@ from py_scripts.debug import router as debug_router
 from py_scripts.config import config
 from py_scripts.emailSend import send_email
 import py_scripts.login as login
-from fastapi import FastAPI, HTTPException, Response
-from fastapi.responses import StreamingResponse
-import io
 from pdf_generator import generate_receipt_pdf
+
 # Logging Utilities
 from py_scripts.logging import (
     PerformanceLoggingMiddleware, 
@@ -138,7 +137,9 @@ async def serve_login():
     return FileResponse("webpages/login.html")
 
 @app.get("/payment")
-async def serve_payment():
+async def serve_payment(session_authenticated: Optional[str] = Cookie(None)):
+    if session_authenticated != "true":
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/payment.html")
 
 @app.get("/register-payment")
@@ -170,8 +171,20 @@ async def serve_staff_login():
     return FileResponse("webpages/staff_login.html")
 
 @app.get("/staff-dashboard")
-async def serve_staff_dashboard():
+async def serve_staff_dashboard(
+    session_authenticated: Optional[str] = Cookie(None),
+    staff_authenticated: Optional[str] = Cookie(None)
+):
+    if session_authenticated != "true" and staff_authenticated != "true":
+        return RedirectResponse(url="/staff-login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/staff_dashboard.html")
+
+@app.get("/logout")
+async def logout():
+    response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(key="session_authenticated", path="/")
+    response.delete_cookie(key="staff_authenticated", path="/")
+    return response
 
 
 # --- User Authentication Endpoints ---
@@ -351,12 +364,16 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         raise HTTPException(status_code=401, detail="Invalid staff credentials.")
         
     log_auth_event("STAFF_LOGIN", data.email, "SUCCESS", client_ip, f"Staff ID: {staff.id}")
-    return {
+    
+    response = JSONResponse(content={
         "status": "success", 
         "staff_id": staff.id, 
         "email": staff.email, 
         "assigned_pincode": staff.assigned_pincode
-    }
+    })
+    response.set_cookie(key="staff_authenticated", value="true", httponly=False, samesite="lax", path="/")
+    response.set_cookie(key="session_authenticated", value="true", httponly=False, samesite="lax", path="/")
+    return response
 
 @app.post("/api/staff/users/{user_id}/review")
 async def review_user_profile(
@@ -371,7 +388,6 @@ async def review_user_profile(
     user.profile_complete = True if data.action == "approve" else False
     db.commit()
     return {"status": "success", "message": f"User profile status updated to {data.action}"}
-
 
 
 # --- Recycling & Waste Transactions ---
@@ -651,10 +667,6 @@ async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/recycling/receipt/{entry_id}")
 async def download_receipt(entry_id: int):
-    # Replace this lookup dictionary with your actual database query (e.g., SQLAlchemy/SQLModel)
-    # Example DB query: entry = await db.query(RecyclingEntry).filter_by(id=entry_id).first()
-    
-    # Mock lookup for demonstration structure
     mock_entry = {
         "entry_id": entry_id,
         "waste_category": "plastic",
@@ -669,10 +681,8 @@ async def download_receipt(entry_id: int):
     if not mock_entry:
         raise HTTPException(status_code=404, detail="Recycling entry not found.")
 
-    # Generate PDF bytes
     pdf_bytes = generate_receipt_pdf(mock_entry)
 
-    # Stream as downloadable PDF response
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
@@ -694,7 +704,6 @@ async def review_recycling_entry(
 
     new_status = "approved" if data.action == "approve" else "declined"
     
-    # Directly update database state
     entry.status = new_status
     entry.reviewed_by_staff_id = data.staff_id
     if data.action == "decline":
