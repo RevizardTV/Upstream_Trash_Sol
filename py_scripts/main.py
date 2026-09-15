@@ -139,7 +139,7 @@ async def serve_login():
 @app.get("/payment")
 async def serve_payment(session_authenticated: Optional[str] = Cookie(None)):
     if session_authenticated != "true":
-        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/payment.html")
 
 @app.get("/register-payment")
@@ -176,12 +176,12 @@ async def serve_staff_dashboard(
     staff_authenticated: Optional[str] = Cookie(None)
 ):
     if session_authenticated != "true" and staff_authenticated != "true":
-        return RedirectResponse(url="/staff-login", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/staff_dashboard.html")
 
 @app.get("/logout")
 async def logout():
-    response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(key="session_authenticated", path="/")
     response.delete_cookie(key="staff_authenticated", path="/")
     return response
