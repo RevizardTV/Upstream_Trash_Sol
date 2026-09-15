@@ -66,6 +66,10 @@ async def verify_staff_session(staff_token: Optional[str]) -> bool:
 async def serve_index():
     return FileResponse("webpages/index.html")
 
+@app.get("/register-profile", response_class=HTMLResponse)
+async def serve_register_profile():
+    return FileResponse("webpages/register_profile.html")
+
 @app.get("/login", response_class=HTMLResponse)
 async def serve_login(session_authenticated: Optional[str] = Cookie(None)):
     if await verify_user_session(session_authenticated):
