@@ -2,6 +2,25 @@
  * EcoRecycle - Unified Single Page Application Controller
  */
 
+// --- GLOBAL FETCH AUTHENTICATION INTERCEPTOR ---
+// Automatically catches 401 Unauthorized responses from backend API calls
+// and forces a redirect to the login page.
+(function () {
+    const originalFetch = window.fetch;
+
+    window.fetch = async function (...args) {
+        const response = await originalFetch.apply(this, args);
+
+        if (response.status === 401) {
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.href = "/login";
+        }
+
+        return response;
+    };
+})();
+
 // 1. Tip Guidance Dictionary
 const RECYCLING_TIPS = {
     plastic: "Separate PET bottles from soft films. Ensure items are clean and dry for maximum payout value.",
@@ -24,10 +43,11 @@ function getAuthParam() {
 }
 
 // Global Logout Action
+// Revokes backend session in Redis and clears cookies via server redirect
 window.logout = function() {
     localStorage.clear();
     sessionStorage.clear();
-    window.location.href = "/login";
+    window.location.href = "/logout";
 };
 
 // Global Tip Popup Activator
@@ -173,7 +193,6 @@ async function loadReviewedRequests() {
                 return;
             }
 
-            // Locate inside loadReviewedRequests() within master_payment.js:
             data.entries.forEach(entry => {
                 const isApproved = entry.status === "approved";
                 const statusBadge = isApproved

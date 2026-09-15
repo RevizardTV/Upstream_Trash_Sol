@@ -52,16 +52,27 @@ app = FastAPI(title="EcoRecycle API")
 # Register Performance & Route Timing Middleware
 app.add_middleware(PerformanceLoggingMiddleware)
 
-# --- Security Anti-Caching Middleware ---
-# Prevents browser back-button navigation to authenticated pages after leaving/logout
+
+# --- Global Anti-Caching Security Middleware ---
+# Instructs browsers NEVER to cache protected HTML pages or sensitive API endpoints.
+# Prevents loading authenticated views via the "Back" button or URL-bar typing after logout.
 @app.middleware("http")
 async def add_no_cache_headers(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith(("/payment", "/staff-dashboard", "/pending-payments", "/reviewed-requests", "/payment-info", "/api")):
+    protected_paths = (
+        "/payment", 
+        "/staff-dashboard", 
+        "/pending-payments", 
+        "/reviewed-requests", 
+        "/payment-info", 
+        "/api"
+    )
+    if request.url.path.startswith(protected_paths):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
+
 
 # CORS Middleware Configuration
 origins = [
@@ -90,26 +101,26 @@ for folder in ["static", "image_assets", "webpages"]:
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# --- Helper Session Helpers ---
+# --- Session Helper Functions ---
 
-SESSION_EXPIRE_SECONDS = 3600  # 1 hour active session lifetime
+SESSION_EXPIRE_SECONDS = 3600  # 1 Hour active session window
 
 async def verify_user_session(session_authenticated: Optional[str]) -> bool:
+    """Verifies user session token against active Redis keys."""
     if not session_authenticated:
         return False
-    # Validate session token in Redis
     exists = await redis_client.exists(f"session:{session_authenticated}")
     return bool(exists)
 
 async def verify_staff_session(staff_authenticated: Optional[str]) -> bool:
+    """Verifies staff session token against active Redis keys."""
     if not staff_authenticated:
         return False
-    # Validate staff session token in Redis
     exists = await redis_client.exists(f"staff_session:{staff_authenticated}")
     return bool(exists)
 
 
-# --- Pydantic Schemas ---
+# --- Pydantic Data Models ---
 
 class OTPRequest(BaseModel):
     email_address: EmailStr
@@ -157,7 +168,7 @@ class EntryReviewSchema(BaseModel):
     staff_id: Optional[int] = None
 
 
-# --- Frontend Webpage Handlers ---
+# --- Webpage Route Handlers (HTML Serving) ---
 
 @app.get("/")
 async def serve_home():
@@ -234,7 +245,7 @@ async def staff_logout(staff_authenticated: Optional[str] = Cookie(None)):
     return response
 
 
-# --- User Authentication Endpoints ---
+# --- User Auth API Routes ---
 
 @app.post("/api/auth/request-otp")
 async def request_otp(data: OTPRequest, request: Request):
@@ -290,7 +301,7 @@ async def verify_otp_route(data: OTPVerify, request: Request):
             
         log_auth_event("OTP_VERIFY", data.email_address, "SUCCESS", client_ip, "Session cookie granted")
         
-        # Generate cryptographically secure session token and save to Redis
+        # Save UUID token to Redis
         session_token = str(uuid.uuid4())
         await redis_client.setex(f"session:{session_token}", SESSION_EXPIRE_SECONDS, data.email_address)
 
@@ -309,7 +320,7 @@ async def verify_otp_route(data: OTPVerify, request: Request):
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"OTP Verification system failure for {data.email_address}: {str(e)}", exc_info=True)
+        logger.error(f"OTP Verification failure for {data.email_address}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while verifying the OTP."
@@ -320,16 +331,14 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
     user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
     
     user_data = data.model_dump()
-    user_data["profile_complete"] = False  # Mark unreviewed by default
+    user_data["profile_complete"] = False
 
     if not user:
         user = UserProfile(**user_data)
         db.add(user)
-        logger.info(f"Created new user profile for {data.email}")
     else:
         for field, value in user_data.items():
             setattr(user, field, value)
-        logger.info(f"Updated existing user profile for User ID #{user.id}")
             
     db.commit()
     db.refresh(user)
@@ -348,7 +357,7 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
     return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
 
 
-# --- User Profile & Data Endpoints ---
+# --- User Profile & Data API ---
 
 @app.get("/api/user/profile")
 async def get_user_profile(
@@ -389,7 +398,7 @@ async def get_user_profile(
     }
 
 
-# --- Staff Authorization Endpoints ---
+# --- Staff Management API ---
 
 @app.post("/api/staff/register")
 async def register_staff_account(data: StaffRegisterSchema, request: Request, db: Session = Depends(get_db)):
@@ -429,7 +438,6 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         
     log_auth_event("STAFF_LOGIN", data.email, "SUCCESS", client_ip, f"Staff ID: {staff.id}")
     
-    # Store dynamic staff session in Redis
     staff_token = str(uuid.uuid4())
     await redis_client.setex(f"staff_session:{staff_token}", SESSION_EXPIRE_SECONDS, staff.email)
 
@@ -462,7 +470,7 @@ async def review_user_profile(
     return {"status": "success", "message": f"User profile status updated to {data.action}"}
 
 
-# --- Recycling & Waste Transactions ---
+# --- Recycling API Routes ---
 
 @app.post("/api/recycling/entry")
 async def add_recycling_entry(
@@ -476,7 +484,7 @@ async def add_recycling_entry(
     try:
         user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
         if not user:
-            raise HTTPException(status_code=404, detail=f"User ID {data.user_id} not found in user_profiles.")
+            raise HTTPException(status_code=404, detail=f"User ID {data.user_id} not found.")
             
         new_entry = RecyclingEntry(
             user_id=data.user_id,
@@ -608,7 +616,6 @@ async def get_user_recycling_summary(
 
     entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).all()
 
-    # Total Earnings only includes approved entries
     approved_total = sum(float(e.payout_amount) for e in entries if getattr(e, "status", "pending") == "approved")
     pending_total = sum(float(e.payout_amount) for e in entries if getattr(e, "status", "pending") == "pending")
     total_approved_weight = sum(float(e.weight_kg) for e in entries if getattr(e, "status", "pending") == "approved")
@@ -633,7 +640,7 @@ async def get_user_recycling_summary(
     }
 
 
-# --- Staff District Inspection API ---
+# --- Staff Inspection API ---
 
 @app.get("/api/admin/district-users")
 async def get_district_users(
@@ -651,7 +658,6 @@ async def get_district_users(
 
     district_prefix = staff_pincode[:3]
     
-    # Exclude already completed/approved users
     query = db.query(UserProfile).filter(
         UserProfile.postal_code.like(f"{district_prefix}%"),
         UserProfile.profile_complete == False
@@ -687,9 +693,6 @@ async def get_district_users(
             } for p in profiles
         ]
     }
-
-
-# --- Admin Utility Endpoint ---
 
 @app.get("/api/admin/show-data")
 async def show_data(
@@ -742,8 +745,7 @@ async def show_data(
             status_code=400, 
             detail=f"Unknown table parameter '{table}'."
         )
-        
-# --- GET Household Pending Trash Entries for Staff Review ---
+
 @app.get("/api/admin/user-pending-entries/{user_id}")
 async def get_user_pending_entries(
     user_id: int, 
@@ -806,7 +808,6 @@ async def download_receipt(
         }
     )
 
-# --- REVIEW (Approve / Decline) Waste Entry ---
 @app.post("/api/staff/entries/{entry_id}/review")
 async def review_recycling_entry(
     entry_id: int, 
