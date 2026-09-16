@@ -216,6 +216,13 @@ async def logout():
     response.delete_cookie(key="staff_authenticated", path="/")
     return response
 
+@app.get("/staff-logout")
+async def staff_logout():
+    response = RedirectResponse(url="/staff_login", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(key="session_authenticated", path="/")
+    response.delete_cookie(key="staff_authenticated", path="/")
+    return response
+
 
 # --- Modularized OTP User Authentication Endpoints ---
 
