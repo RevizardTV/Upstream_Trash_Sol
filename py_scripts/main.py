@@ -3,8 +3,8 @@ import os
 import sys
 import io
 import traceback
+import bcrypt
 from typing import Optional
-from passlib.context import CryptContext
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,14 +39,16 @@ from py_scripts.logging import (
     logger
 )
 
-# Password Hashing Setup
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+# Direct Bcrypt Hashing (Bypasses Passlib 4.x Bugs)
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    pwd_bytes = password.encode('utf-8')[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    pwd_bytes = plain_password.encode('utf-8')[:72]
+    hash_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(pwd_bytes, hash_bytes)
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 Base.metadata.create_all(bind=engine)
