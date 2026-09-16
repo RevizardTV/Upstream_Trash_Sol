@@ -66,27 +66,28 @@ app.add_middleware(PerformanceLoggingMiddleware)
 
 # --- Middleware for Deep Payload and Request Inspection ---
 # --- Global Middleware for Route Scope Cookie Enforcement ---
+
 @app.middleware("http")
 async def enforce_strict_route_cookie_scopes(request: Request, call_next):
     path = request.url.path
     response = await call_next(request)
 
-    # Allow static assets and API calls to process without wiping cookies
+    # Do not clear cookies on static assets or API endpoints
     if path.startswith("/static") or path.startswith("/api"):
         return response
 
-    # 1. Non-user web routes must scrub 'user_authenticated'
     allowed_user_paths = ["/payment", "/pending-payments", "/reviewed-requests"]
+    allowed_staff_paths = ["/staff-dashboard"]
+
+    # If user is visiting a route that is NOT a protected user route, strip user cookie
     if path not in allowed_user_paths:
         response.delete_cookie(key="user_authenticated", path="/")
 
-    # 2. Non-staff web routes must scrub 'staff_authenticated'
-    allowed_staff_paths = ["/staff-dashboard"]
+    # If user is visiting a route that is NOT a protected staff route, strip staff cookie
     if path not in allowed_staff_paths:
         response.delete_cookie(key="staff_authenticated", path="/")
 
     return response
-
 
 @app.middleware("http")
 async def inspect_incoming_requests(request: Request, call_next):
