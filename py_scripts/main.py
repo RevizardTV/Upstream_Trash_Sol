@@ -372,6 +372,7 @@ async def register_staff_account(data: StaffRegisterSchema, request: Request, db
 
 @app.post("/api/staff/login")
 async def login_staff_account(data: StaffLoginSchema, request: Request, db: Session = Depends(get_db)):
+    print("STAFF LOGIN ACTIVATED")
     client_ip = extract_client_ip(request)
     staff = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
     
