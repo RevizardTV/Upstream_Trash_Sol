@@ -1,17 +1,21 @@
+// static/js/authguard.js
 (function () {
-    // 1. Fetch all possible auth indicators
     const userId = localStorage.getItem("user_id");
     const email = localStorage.getItem("email") || localStorage.getItem("verified_email");
-    
-    // Check cookies for session/user_id
-    const hasSessionCookie = document.cookie.split(";").some(item => {
-        const cookie = item.trim();
-        return cookie.startsWith("session=") || cookie.startsWith("user_id=");
-    });
 
-    // 2. If NO valid auth indicators are found, redirect immediately
-    if (!userId && !email && !hasSessionCookie) {
-        // Use location.replace so the user cannot click 'Back' to return to this page
+    // Check for cookie session
+    const hasCookie = document.cookie.split(';').some(c => c.trim().startsWith('session=') || c.trim().startsWith('user_id='));
+
+    // If NO valid identity exists
+    if (!userId && !email && !hasCookie) {
+        // 1. Clear any broken state
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // 2. Redirect immediately
         window.location.replace("/login");
+
+        // 3. Throw an error to freeze further JS execution in this tick
+        throw new Error("Unauthorized access. Redirecting to login...");
     }
 })();

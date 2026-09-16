@@ -39,7 +39,7 @@ function getAuthParam() {
     if (!userId && !verifiedEmail) {
         return "";
     }
-    return userId ? `user_id=${userId}` : `email=${encodeURIComponent(verifiedEmail)}`;
+    return userId ? `user_id=${encodeURIComponent(userId)}` : `email=${encodeURIComponent(verifiedEmail)}`;
 }
 
 // Global Logout Action
@@ -68,6 +68,11 @@ window.showTip = function(category) {
 // 1. Profile & Dashboard Summary Retrieval API
 async function loadDashboardMetrics() {
     const param = getAuthParam();
+    if (!param && !document.cookie.includes("session=")) {
+        console.warn("[PaymentHub] Aborting loadDashboardMetrics: No active session/credentials found.");
+        return;
+    }
+
     const queryStr = param ? `?${param}` : "";
 
     // Fetch Profile Name & Email
@@ -117,6 +122,11 @@ async function loadDashboardMetrics() {
 // 2. Pending Queue Data Fetcher API
 async function loadPendingPayments() {
     const param = getAuthParam();
+    if (!param && !document.cookie.includes("session=")) {
+        console.warn("[PaymentHub] Aborting loadPendingPayments: No active session/credentials found.");
+        return;
+    }
+
     const queryStr = param ? `?${param}` : "";
 
     const tableBody = document.getElementById("pendingPaymentsTableBody");
@@ -202,6 +212,11 @@ async function loadPendingPayments() {
 // 3. Reviewed Requests Data Fetcher API
 async function loadReviewedRequests() {
     const param = getAuthParam();
+    if (!param && !document.cookie.includes("session=")) {
+        console.warn("[PaymentHub] Aborting loadReviewedRequests: No active session/credentials found.");
+        return;
+    }
+
     const queryStr = param ? `?${param}` : "";
 
     try {
@@ -281,6 +296,16 @@ window.switchTab = function(targetViewId) {
 
 // --- FORM CALCULATOR & EVENT INITIALIZATION ---
 document.addEventListener("DOMContentLoaded", () => {
+    // Guard: Verify authentication status before initializing application scripts
+    const userId = localStorage.getItem("user_id");
+    const verifiedEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
+    const hasAuthCookie = document.cookie.split(';').some(c => c.trim().startsWith('session='));
+
+    if (!userId && !verifiedEmail && !hasAuthCookie) {
+        console.warn("[PaymentHub] Unauthenticated user state detected. Halting initialization.");
+        return;
+    }
+
     // Initialize default view state and load metrics
     switchTab('view-options');
 
@@ -337,18 +362,24 @@ document.addEventListener("DOMContentLoaded", () => {
             const wasteCategory = selected.dataset.category || selected.value || "Plastic";
             const accountSelect = form.querySelector("select");
 
-            let userId = localStorage.getItem("user_id");
+            let currentUserId = localStorage.getItem("user_id");
 
-            if (!userId) {
-                const verifiedEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
+            if (!currentUserId) {
+                const currentEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
+                if (!currentEmail && !hasAuthCookie) {
+                    alert("Your session has expired. Please log in again.");
+                    window.location.href = "/login";
+                    return;
+                }
+
                 try {
-                    const queryStr = verifiedEmail ? `?email=${encodeURIComponent(verifiedEmail)}` : "";
+                    const queryStr = currentEmail ? `?email=${encodeURIComponent(currentEmail)}` : "";
                     const profileRes = await fetch(`/api/user/profile${queryStr}`);
                     if (profileRes.ok) {
                         const profileData = await profileRes.json();
                         if (profileData?.profile?.id) {
-                            userId = profileData.profile.id;
-                            localStorage.setItem("user_id", userId);
+                            currentUserId = profileData.profile.id;
+                            localStorage.setItem("user_id", currentUserId);
                         }
                     }
                 } catch (err) {
@@ -358,7 +389,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Payload constructed with Station ID and Target Payout Account
             const payload = {
-                user_id: userId ? parseInt(userId) : null,
+                user_id: currentUserId ? parseInt(currentUserId) : null,
                 waste_category: wasteCategory,
                 weight_kg: weight,
                 payout_amount: payout,
