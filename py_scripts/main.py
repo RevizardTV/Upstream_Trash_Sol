@@ -669,22 +669,35 @@ async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
     }
 
 @app.get("/api/recycling/receipt/{entry_id}")
-async def download_receipt(entry_id: int):
-    mock_entry = {
-        "entry_id": entry_id,
-        "waste_category": "plastic",
-        "weight_kg": 12.5,
-        "payout_amount": 150.00,
-        "status": "approved",
-        "station_id": "BIN-COIMBATORE-08",
-        "created_at": "2026-03-28",
-        "user_name": "Jane Doe"
+async def download_receipt(entry_id: int, db: Session = Depends(get_db)):
+    # Perform a joined query across RecyclingEntry and UserProfile
+    result = db.query(RecyclingEntry, UserProfile).\
+        join(UserProfile, RecyclingEntry.user_id == UserProfile.id).\
+        filter(RecyclingEntry.entry_id == entry_id).first()
+
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Recycling entry #{entry_id} not found.")
+
+    entry, user = result
+
+    # Map joined database attributes into structured dynamic payload
+    receipt_payload = {
+        "entry_id": entry.entry_id,
+        "user_name": user.full_name or "Valued Customer",
+        "user_email": user.email,
+        "waste_category": entry.waste_category,
+        "weight_kg": float(entry.weight_kg) if entry.weight_kg is not None else 0.0,
+        "payout_amount": float(entry.payout_amount) if entry.payout_amount is not None else 0.0,
+        "status": getattr(entry, "status", "approved"),
+        "station_id": getattr(entry, "station_id", "BIN-DISTRICT-HUB"),
+        "created_at": entry.created_at
     }
 
-    if not mock_entry:
-        raise HTTPException(status_code=404, detail="Recycling entry not found.")
-
-    pdf_bytes = generate_receipt_pdf(mock_entry)
+    try:
+        pdf_bytes = generate_receipt_pdf(receipt_payload)
+    except Exception as e:
+        logger.error(f"Error generating PDF for entry #{entry_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to render transaction PDF receipt.")
 
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
