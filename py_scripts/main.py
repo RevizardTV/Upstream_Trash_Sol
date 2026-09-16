@@ -282,7 +282,7 @@ async def staff_logout():
     return response
 
 
-# --- Modularized OTP User Authentication Endpoints ---
+# --- Modularized OTP User & Staff Authentication Endpoints ---
 
 @app.post("/api/auth/request-otp")
 async def request_otp(data: OTPRequest, request: Request):
@@ -297,24 +297,43 @@ async def request_otp(data: OTPRequest, request: Request):
         raise e
 
 @app.post("/api/auth/verify-otp")
-async def verify_otp_route(data: OTPVerify, request: Request):
+async def verify_otp_route(data: OTPVerify, request: Request, db: Session = Depends(get_db)):
     client_ip = extract_client_ip(request)
     logger.info(f"🔑 [OTP VERIFY INITIATED] Email: {data.email_address} | Code: {data.otp_code} | IP: {client_ip}")
     try:
         await process_otp_verification(data.email_address, data.otp_code, client_ip)
-        logger.info(f"✅ [OTP VERIFY SUCCESS] Granted session to {data.email_address}")
         
+        # Check if the verifying email belongs to staff
+        is_staff = db.query(StaffProfile).filter(StaffProfile.email == data.email_address).first()
+        logger.info(f"✅ [OTP VERIFY SUCCESS] Granted session to {data.email_address} (Is Staff: {bool(is_staff)})")
+
         response = JSONResponse(
-            content={"status": "success", "message": "OTP verified successfully."}
+            content={
+                "status": "success", 
+                "message": "OTP verified successfully.",
+                "is_staff": bool(is_staff)
+            }
         )
-        response.set_cookie(
-            key="user_authenticated",
-            value="true",
-            httponly=False,
-            samesite="lax",
-            path="/"
-        )
-        response.delete_cookie(key="staff_authenticated", path="/")
+
+        if is_staff:
+            response.set_cookie(
+                key="staff_authenticated",
+                value="true",
+                httponly=False,
+                samesite="lax",
+                path="/"
+            )
+            response.delete_cookie(key="user_authenticated", path="/")
+        else:
+            response.set_cookie(
+                key="user_authenticated",
+                value="true",
+                httponly=False,
+                samesite="lax",
+                path="/"
+            )
+            response.delete_cookie(key="staff_authenticated", path="/")
+
         return response
     except Exception as e:
         logger.error(f"❌ [OTP VERIFY FAILED] Email: {data.email_address} | Error: {str(e)}", exc_info=True)
@@ -438,7 +457,7 @@ async def register_staff_account(data: StaffRegisterSchema, request: Request, db
             status_code=500, 
             detail=f"Staff registration failed due to database schema error: {str(e)}"
         )
-
+        
 @app.post("/api/staff/login")
 async def login_staff_account(data: StaffLoginSchema, request: Request, db: Session = Depends(get_db)):
     client_ip = extract_client_ip(request)
@@ -446,36 +465,23 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
     
     staff = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
     
-    if not staff:
-        logger.warning(f"❌ [STAFF LOGIN FAILED] Email '{data.email}' not found in database")
-        log_auth_event("STAFF_LOGIN", data.email, "FAILED", client_ip, "User not found")
+    if not staff or not verify_password(data.password, staff.password_hash):
+        logger.warning(f"❌ [STAFF LOGIN FAILED] Credentials invalid for '{data.email}'")
+        log_auth_event("STAFF_LOGIN", data.email, "FAILED", client_ip, "Invalid credentials")
         raise HTTPException(status_code=401, detail="Invalid staff credentials.")
 
-    if not verify_password(data.password, staff.password_hash):
-        logger.warning(f"❌ [STAFF LOGIN FAILED] Password mismatch for '{data.email}'")
-        log_auth_event("STAFF_LOGIN", data.email, "FAILED", client_ip, "Invalid password")
-        raise HTTPException(status_code=401, detail="Invalid staff credentials.")
-        
-    logger.info(f"✅ [STAFF LOGIN SUCCESS] Authenticated Staff ID #{staff.id}")
-    log_auth_event("STAFF_LOGIN", data.email, "SUCCESS", client_ip, f"Staff ID: {staff.id}")
-    
-    response = JSONResponse(content={
-        "status": "success", 
-        "staff_id": staff.id, 
-        "email": staff.email, 
+    # 1. Trigger OTP dispatch to staff email
+    await process_otp_request(data.email, client_ip)
+    logger.info(f"📧 [STAFF OTP DISPATCHED] Sent OTP code to {data.email}")
+
+    # 2. Return pending state to frontend without issuing authentication cookies yet
+    return {
+        "status": "otp_required",
+        "message": "Password verified. Please enter the OTP sent to your email.",
+        "email": staff.email,
+        "staff_id": staff.id,
         "assigned_pincode": staff.assigned_pincode
-    })
-    
-    response.set_cookie(
-        key="staff_authenticated", 
-        value="true", 
-        httponly=False, 
-        samesite="lax", 
-        path="/"
-    )
-    response.delete_cookie(key="user_authenticated", path="/")
-    response.delete_cookie(key="session_authenticated", path="/")
-    return response
+    }
 
 @app.post("/api/staff/users/{user_id}/review")
 async def review_user_profile(
