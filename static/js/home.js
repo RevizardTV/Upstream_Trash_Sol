@@ -1,8 +1,20 @@
 const goToLoginBtn = document.getElementById("goToLogin");
+const howItWorksBtn = document.getElementById("howItWorksBtn");
 
 if (goToLoginBtn) {
     goToLoginBtn.addEventListener("click", () => {
         window.location.href = "/login";
+    });
+}
+
+// Smooth scroll listener for "How PAYT Works" button
+if (howItWorksBtn) {
+    howItWorksBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const infoSection = document.getElementById("how-it-works");
+        if (infoSection) {
+            infoSection.scrollIntoView({ behavior: "smooth" });
+        }
     });
 }
 
