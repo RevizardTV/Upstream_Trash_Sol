@@ -158,12 +158,14 @@ async def serve_home():
 
 @app.get("/login")
 async def serve_login():
-    # Removed automatic 303 redirect to prevent endless loop with frontend authguards
     return FileResponse("webpages/login.html")
 
 @app.get("/payment")
-async def serve_payment(session_authenticated: Optional[str] = Cookie(None)):
-    if session_authenticated != "true":
+async def serve_payment(
+    user_authenticated: Optional[str] = Cookie(None),
+    staff_authenticated: Optional[str] = Cookie(None)
+):
+    if user_authenticated != "true" or staff_authenticated == "true":
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/payment.html", headers=NO_CACHE_HEADERS)
 
@@ -172,14 +174,20 @@ async def serve_register_payment():
     return FileResponse("webpages/register_payment.html")
 
 @app.get("/pending-payments")
-async def serve_pending_payments(session_authenticated: Optional[str] = Cookie(None)):
-    if session_authenticated != "true":
+async def serve_pending_payments(
+    user_authenticated: Optional[str] = Cookie(None),
+    staff_authenticated: Optional[str] = Cookie(None)
+):
+    if user_authenticated != "true" or staff_authenticated == "true":
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/pending_payments.html", headers=NO_CACHE_HEADERS)
 
 @app.get("/reviewed-requests")
-async def serve_reviewed_requests(session_authenticated: Optional[str] = Cookie(None)):
-    if session_authenticated != "true":
+async def serve_reviewed_requests(
+    user_authenticated: Optional[str] = Cookie(None),
+    staff_authenticated: Optional[str] = Cookie(None)
+):
+    if user_authenticated != "true" or staff_authenticated == "true":
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/reviewed_requests.html", headers=NO_CACHE_HEADERS)
 
@@ -201,16 +209,17 @@ async def serve_staff_login():
 
 @app.get("/staff-dashboard")
 async def serve_staff_dashboard(
-    session_authenticated: Optional[str] = Cookie(None),
+    user_authenticated: Optional[str] = Cookie(None),
     staff_authenticated: Optional[str] = Cookie(None)
 ):
-    if session_authenticated != "true" and staff_authenticated != "true":
+    if staff_authenticated != "true" or user_authenticated == "true":
         return RedirectResponse(url="/staff-login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/staff_dashboard.html", headers=NO_CACHE_HEADERS)
 
 @app.get("/logout")
 async def logout():
     response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(key="user_authenticated", path="/")
     response.delete_cookie(key="session_authenticated", path="/")
     response.delete_cookie(key="staff_authenticated", path="/")
     return response
@@ -218,6 +227,7 @@ async def logout():
 @app.get("/staff-logout")
 async def staff_logout():
     response = RedirectResponse(url="/staff-login", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(key="user_authenticated", path="/")
     response.delete_cookie(key="session_authenticated", path="/")
     response.delete_cookie(key="staff_authenticated", path="/")
     return response
@@ -239,12 +249,13 @@ async def verify_otp_route(data: OTPVerify, request: Request):
         content={"status": "success", "message": "OTP verified successfully."}
     )
     response.set_cookie(
-        key="session_authenticated",
+        key="user_authenticated",
         value="true",
         httponly=False,
         samesite="lax",
         path="/"
     )
+    response.delete_cookie(key="staff_authenticated", path="/")
     return response
 
 @app.post("/api/auth/complete-profile")
@@ -268,12 +279,13 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
         db.refresh(user)
 
         response.set_cookie(
-            key="session_authenticated",
+            key="user_authenticated",
             value="true",
             httponly=False,
             samesite="lax",
             path="/"
         )
+        response.delete_cookie(key="staff_authenticated", path="/")
         return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
     except Exception as e:
         db.rollback()
@@ -287,10 +299,10 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
 async def get_user_profile(
     user_id: Optional[int] = Query(None), 
     email: Optional[str] = Query(None), 
-    session_authenticated: Optional[str] = Cookie(None),
+    user_authenticated: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
-    if session_authenticated != "true":
+    if user_authenticated != "true":
         raise HTTPException(status_code=401, detail="Unauthorized session")
 
     if not user_id and not email:
@@ -376,7 +388,8 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         "assigned_pincode": staff.assigned_pincode
     })
     response.set_cookie(key="staff_authenticated", value="true", httponly=False, samesite="lax", path="/")
-    response.set_cookie(key="session_authenticated", value="true", httponly=False, samesite="lax", path="/")
+    response.delete_cookie(key="user_authenticated", path="/")
+    response.delete_cookie(key="session_authenticated", path="/")
     return response
 
 @app.post("/api/staff/users/{user_id}/review")
@@ -420,7 +433,6 @@ async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(
         db.commit()
         db.refresh(new_entry)
         
-        # Use user.id here to satisfy the static type checker
         log_recycling_action("SUBMIT", user.id, data.weight_kg, "PENDING", f"Category: {data.waste_category}")
         return {
             "status": "success", 
