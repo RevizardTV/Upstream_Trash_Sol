@@ -13,7 +13,7 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex">
+<body class="bg-slate-900 text-slate-100 min-h-screen flex relative overflow-x-hidden">
 
     <!-- MASTER SIDEBAR -->
     <aside class="w-72 bg-slate-800/50 border-r border-slate-700/60 p-6 flex flex-col justify-between hidden md:flex sticky top-0 h-screen shrink-0">
@@ -63,7 +63,7 @@
     </aside>
 
     <!-- DYNAMIC VIEW CONTAINER -->
-    <main class="flex-1 p-6 md:p-10 overflow-y-auto">
+    <main class="flex-1 p-6 md:p-10 overflow-y-auto max-w-full">
 
         <!-- OPTIONS VIEW -->
         <section id="view-options" class="view-panel space-y-8">
@@ -114,54 +114,58 @@
                 <p class="text-slate-400 text-sm mt-1">Log waste categories to calculate payouts or calculate PAYT municipal disposal charges.</p>
             </header>
 
-            <form id="paymentRegisterForm" class="max-w-3xl bg-slate-800/60 border border-slate-700/80 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
+            <form id="paymentRegisterForm" class="w-full bg-slate-800/60 border border-slate-700/80 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
                 <div>
                     <label class="block text-sm font-semibold text-slate-200 mb-3">1. Select Waste Category</label>
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        <label class="relative cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
-                            <button type="button" onclick="event.stopPropagation(); showTip('plastic')" class="absolute top-2 right-2 text-slate-400 hover:text-emerald-400 transition" title="Category Tip">
-                                <i class="fa-solid fa-circle-info text-xs"></i>
+                    
+                    <!-- Clean Grid Layout without overlapping absolute elements -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                        
+                        <label class="cursor-pointer border border-slate-700/80 rounded-xl p-3.5 flex flex-col items-center text-center justify-between gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 transition relative group min-h-[110px]">
+                            <button type="button" onclick="event.stopPropagation(); showTip('plastic')" class="absolute top-2.5 right-2.5 text-slate-500 hover:text-emerald-400 transition p-1" title="Category Tip">
+                                <i class="fa-solid fa-circle-info text-sm"></i>
                             </button>
                             <input type="radio" name="material" value="plastic" data-rate="15.00" data-category="Plastic" data-type="payout" class="sr-only" checked>
-                            <i class="fa-solid fa-bottle-water text-emerald-400 text-xl"></i>
-                            <span class="text-xs font-semibold">Plastic (+₹15/kg)</span>
+                            <i class="fa-solid fa-bottle-water text-emerald-400 text-2xl mt-2"></i>
+                            <span class="text-xs font-semibold text-slate-200">Plastic <span class="block text-[11px] text-emerald-400 font-normal">+₹15/kg</span></span>
                         </label>
 
-                        <label class="relative cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
-                            <button type="button" onclick="event.stopPropagation(); showTip('metal')" class="absolute top-2 right-2 text-slate-400 hover:text-amber-400 transition" title="Category Tip">
-                                <i class="fa-solid fa-circle-info text-xs"></i>
+                        <label class="cursor-pointer border border-slate-700/80 rounded-xl p-3.5 flex flex-col items-center text-center justify-between gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 transition relative group min-h-[110px]">
+                            <button type="button" onclick="event.stopPropagation(); showTip('metal')" class="absolute top-2.5 right-2.5 text-slate-500 hover:text-amber-400 transition p-1" title="Category Tip">
+                                <i class="fa-solid fa-circle-info text-sm"></i>
                             </button>
                             <input type="radio" name="material" value="metal" data-rate="45.00" data-category="Metal" data-type="payout" class="sr-only">
-                            <i class="fa-solid fa-layer-group text-amber-400 text-xl"></i>
-                            <span class="text-xs font-semibold">Metal (+₹45/kg)</span>
+                            <i class="fa-solid fa-layer-group text-amber-400 text-2xl mt-2"></i>
+                            <span class="text-xs font-semibold text-slate-200">Metal <span class="block text-[11px] text-amber-400 font-normal">+₹45/kg</span></span>
                         </label>
 
-                        <label class="relative cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
-                            <button type="button" onclick="event.stopPropagation(); showTip('paper')" class="absolute top-2 right-2 text-slate-400 hover:text-sky-400 transition" title="Category Tip">
-                                <i class="fa-solid fa-circle-info text-xs"></i>
+                        <label class="cursor-pointer border border-slate-700/80 rounded-xl p-3.5 flex flex-col items-center text-center justify-between gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 transition relative group min-h-[110px]">
+                            <button type="button" onclick="event.stopPropagation(); showTip('paper')" class="absolute top-2.5 right-2.5 text-slate-500 hover:text-sky-400 transition p-1" title="Category Tip">
+                                <i class="fa-solid fa-circle-info text-sm"></i>
                             </button>
                             <input type="radio" name="material" value="paper" data-rate="8.00" data-category="Paper" data-type="payout" class="sr-only">
-                            <i class="fa-solid fa-box text-sky-400 text-xl"></i>
-                            <span class="text-xs font-semibold">Paper (+₹8/kg)</span>
+                            <i class="fa-solid fa-box text-sky-400 text-2xl mt-2"></i>
+                            <span class="text-xs font-semibold text-slate-200">Paper <span class="block text-[11px] text-sky-400 font-normal">+₹8/kg</span></span>
                         </label>
 
-                        <label class="relative cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
-                            <button type="button" onclick="event.stopPropagation(); showTip('ewaste')" class="absolute top-2 right-2 text-slate-400 hover:text-purple-400 transition" title="Category Tip">
-                                <i class="fa-solid fa-circle-info text-xs"></i>
+                        <label class="cursor-pointer border border-slate-700/80 rounded-xl p-3.5 flex flex-col items-center text-center justify-between gap-2 hover:border-emerald-500/50 bg-slate-800/40 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 transition relative group min-h-[110px]">
+                            <button type="button" onclick="event.stopPropagation(); showTip('ewaste')" class="absolute top-2.5 right-2.5 text-slate-500 hover:text-purple-400 transition p-1" title="Category Tip">
+                                <i class="fa-solid fa-circle-info text-sm"></i>
                             </button>
                             <input type="radio" name="material" value="ewaste" data-rate="65.00" data-category="E-Waste" data-type="payout" class="sr-only">
-                            <i class="fa-solid fa-plug text-purple-400 text-xl"></i>
-                            <span class="text-xs font-semibold">E-Waste (+₹65/kg)</span>
+                            <i class="fa-solid fa-plug text-purple-400 text-2xl mt-2"></i>
+                            <span class="text-xs font-semibold text-slate-200">E-Waste <span class="block text-[11px] text-purple-400 font-normal">+₹65/kg</span></span>
                         </label>
 
-                        <label class="relative cursor-pointer border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-rose-500/50 bg-slate-800/40 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-500/10">
-                            <button type="button" onclick="event.stopPropagation(); showTip('landfill')" class="absolute top-2 right-2 text-slate-400 hover:text-rose-400 transition" title="Category Tip">
-                                <i class="fa-solid fa-circle-info text-xs"></i>
+                        <label class="cursor-pointer border border-slate-700/80 rounded-xl p-3.5 flex flex-col items-center text-center justify-between gap-2 hover:border-rose-500/50 bg-slate-800/40 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-500/10 transition relative group min-h-[110px]">
+                            <button type="button" onclick="event.stopPropagation(); showTip('landfill')" class="absolute top-2.5 right-2.5 text-slate-500 hover:text-rose-400 transition p-1" title="Category Tip">
+                                <i class="fa-solid fa-circle-info text-sm"></i>
                             </button>
                             <input type="radio" name="material" value="landfill" data-rate="-12.00" data-category="Landfill" data-type="charge" class="sr-only">
-                            <i class="fa-solid fa-trash-can text-rose-400 text-xl"></i>
-                            <span class="text-xs font-semibold">Landfill (-₹12/kg)</span>
+                            <i class="fa-solid fa-trash-can text-rose-400 text-2xl mt-2"></i>
+                            <span class="text-xs font-semibold text-slate-200">Landfill <span class="block text-[11px] text-rose-400 font-normal">-₹12/kg</span></span>
                         </label>
+
                     </div>
                 </div>
 
@@ -199,7 +203,7 @@
         </section>
 
         <!-- PENDING QUEUE VIEW -->
-        <section id="view-pending" class="view-panel hidden">
+        <section id="view-pending" class="view-panel hidden space-y-6">
             <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <div>
                     <h1 class="text-2xl md:text-3xl font-bold text-white">Pending Transaction Queue</h1>
@@ -238,7 +242,7 @@
         </section>
 
         <!-- REVIEWED REQUESTS VIEW -->
-        <section id="view-reviewed" class="view-panel hidden">
+        <section id="view-reviewed" class="view-panel hidden space-y-6">
             <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-slate-800 pb-6">
                 <div>
                     <h1 class="text-2xl md:text-3xl font-bold text-white tracking-tight">Reviewed Requests</h1>
@@ -280,7 +284,6 @@
                 <p class="text-slate-400 text-sm mt-1">Overview of recycling reward rates, landfill tipping fees, and regulatory policies.</p>
             </header>
 
-            <!-- Rate Schedule Comparison Card -->
             <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-6 mb-8 shadow-lg">
                 <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
                     <i class="fa-solid fa-scale-balanced text-emerald-400"></i> Category Rate Breakdown
@@ -314,7 +317,6 @@
                 </div>
             </div>
 
-            <!-- Detailed Policy Explanations -->
             <div class="space-y-6 text-slate-300 text-sm leading-relaxed bg-slate-800/40 border border-slate-700/60 p-6 rounded-2xl shadow-xl">
                 <div>
                     <h4 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
@@ -345,19 +347,19 @@
 
     </main>
 
-    <!-- OPTIMIZATION TIP POPUP MODAL -->
-    <div id="infoPanel" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+    <!-- FIXED OVERLAY MODAL (Outside main flow to stop view pollution) -->
+    <div id="infoPanel" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
                 <h3 id="infoTitle" class="text-base font-bold text-white flex items-center gap-2">
                     <i class="fa-solid fa-lightbulb text-amber-400"></i> Optimization Tip
                 </h3>
-                <button onclick="document.getElementById('infoPanel').classList.add('hidden')" class="text-slate-400 hover:text-white text-lg">
+                <button type="button" onclick="document.getElementById('infoPanel').classList.add('hidden')" class="text-slate-400 hover:text-white transition text-lg px-2">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
             <p id="infoContent" class="text-sm text-slate-300 leading-relaxed"></p>
-            <button onclick="document.getElementById('infoPanel').classList.add('hidden')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 rounded-xl transition text-sm">
+            <button type="button" onclick="document.getElementById('infoPanel').classList.add('hidden')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 rounded-xl transition text-sm">
                 Got it
             </button>
         </div>
