@@ -72,7 +72,6 @@ async def inspect_incoming_requests(request: Request, call_next):
         logger.info(f"📥 [REQUEST START] {request.method} {path} | Client IP: {extract_client_ip(request)}")
         logger.info(f"📋 [HEADERS] Content-Type: {request.headers.get('content-type')} | User-Agent: {request.headers.get('user-agent')}")
         
-        # Read body for inspection without consuming stream permanently
         if request.method in ["POST", "PUT", "PATCH"]:
             body_bytes = await request.body()
             logger.info(f"📦 [RAW BODY]: {body_bytes.decode('utf-8', errors='ignore')}")
@@ -89,7 +88,7 @@ async def inspect_incoming_requests(request: Request, call_next):
         
     return response
 
-# --- Validation Exception Handler (Catches 422/400 Data Mismatches) ---
+# --- Validation Exception Handler ---
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     body = await request.body()
@@ -101,7 +100,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"status": "error", "detail": exc.errors(), "body": exc.body}
     )
 
-# --- HTTP Exception Handler (Catches Explicit 400 Bad Requests) ---
+# --- HTTP Exception Handler ---
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code >= 400:
@@ -260,7 +259,9 @@ async def serve_staff_dashboard(
     user_authenticated: Optional[str] = Cookie(None),
     staff_authenticated: Optional[str] = Cookie(None)
 ):
+    logger.info(f"🛡️ [STAFF DASHBOARD CHECK] staff_authenticated={staff_authenticated} | user_authenticated={user_authenticated}")
     if staff_authenticated != "true" or user_authenticated == "true":
+        logger.warning("🔒 [STAFF DASHBOARD ACCESS REJECTED] Redirecting to /staff-login")
         return RedirectResponse(url="/staff-login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/staff_dashboard.html", headers=NO_CACHE_HEADERS)
 
