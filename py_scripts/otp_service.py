@@ -1,8 +1,7 @@
-# py_scripts/otp_service.py
 from pydantic import BaseModel, EmailStr
 from fastapi import HTTPException, status, Request
 from resend.exceptions import ResendError
-
+from typing import Optional
 from py_scripts import login
 from py_scripts.emailSend import send_email
 from py_scripts.logging import log_auth_event, logger
@@ -10,6 +9,7 @@ from py_scripts.logging import log_auth_event, logger
 # Schemas
 class OTPRequest(BaseModel):
     email_address: EmailStr
+    type: Optional[str] = "user"
 
 class OTPVerify(BaseModel):
     email_address: EmailStr
@@ -32,7 +32,7 @@ async def process_otp_request(email_address: str, client_ip: str):
         log_auth_event("OTP_REQUEST", email_address, "FAILED", client_ip, error or "Rate limit exceeded")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS, 
-            detail=error or "Failed to generate OTP code."
+            detail=error or "Too many OTP requests. Please wait before retrying."
         )
     
     try:

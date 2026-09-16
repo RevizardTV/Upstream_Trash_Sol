@@ -28,7 +28,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const submitBtn = document.getElementById("submitBtn");
 
-    // Start 60-second countdown
     function startTimer() {
         let timeLeft = 60;
         const timerDisplay = document.getElementById("staffRegTimerText");
@@ -81,7 +80,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify({ email_address: email, type: "staff" })
             });
 
-            const data = await res.json();
+            const contentType = res.headers.get("content-type");
+            let data = {};
+            if (contentType && contentType.includes("application/json")) {
+                data = await res.json();
+            } else {
+                const textErr = await res.text();
+                data = { detail: textErr || `Server returned HTTP ${res.status}` };
+            }
 
             if (res.ok) {
                 alert(`Authorization code sent to ${email}. Check your inbox!`);
@@ -90,7 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 otpSection.classList.remove("hidden");
                 startTimer();
             } else {
-                alert("Failed to send code: " + (data.detail || "Error requesting OTP"));
+                alert("Failed to send code: " + (data.detail || "Rate limit or server error."));
                 submitBtn.disabled = false;
                 submitBtn.textContent = "Send Authorization Code";
             }
@@ -142,7 +148,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify(payload)
             });
 
-            const regData = await regRes.json();
+            const contentType = regRes.headers.get("content-type");
+            let regData = {};
+            if (contentType && contentType.includes("application/json")) {
+                regData = await regRes.json();
+            } else {
+                const rawText = await regRes.text();
+                regData = { detail: rawText || "Server Internal Error" };
+            }
 
             if (regRes.ok) {
                 if (timerInterval) clearInterval(timerInterval);

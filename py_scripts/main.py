@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import io
+import traceback
 from typing import Optional
 from passlib.context import CryptContext
 
@@ -59,6 +60,20 @@ redis_client = redis.from_url(redis_url, decode_responses=True)
 
 app = FastAPI(title="EcoRecycle API")
 app.add_middleware(PerformanceLoggingMiddleware)
+
+# --- Global Exception Handler for Uncaught 500 Errors ---
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"🔥 Unhandled Exception on {request.method} {request.url.path}: {str(exc)}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "detail": f"Internal Server Error: {str(exc)}",
+            "path": request.url.path
+        }
+    )
 
 NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0, private",
@@ -215,7 +230,6 @@ async def verify_otp_route(data: OTPVerify, request: Request):
     response = JSONResponse(
         content={"status": "success", "message": "OTP verified successfully."}
     )
-    # Enforce HttpOnly cookie to prevent client tampering
     response.set_cookie(
         key="session_authenticated",
         value="true",
@@ -227,31 +241,36 @@ async def verify_otp_route(data: OTPVerify, request: Request):
 
 @app.post("/api/auth/complete-profile")
 async def save_user_profile(data: ProfileCreateSchema, response: Response, db: Session = Depends(get_db)):
-    user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
-    
-    user_data = data.model_dump()
-    user_data["profile_complete"] = False
+    try:
+        user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
+        
+        user_data = data.model_dump()
+        user_data["profile_complete"] = False
 
-    if not user:
-        user = UserProfile(**user_data)
-        db.add(user)
-        logger.info(f"Created new user profile for {data.email}")
-    else:
-        for field, value in user_data.items():
-            setattr(user, field, value)
-        logger.info(f"Updated existing user profile for User ID #{user.id}")
-            
-    db.commit()
-    db.refresh(user)
+        if not user:
+            user = UserProfile(**user_data)
+            db.add(user)
+            logger.info(f"Created new user profile for {data.email}")
+        else:
+            for field, value in user_data.items():
+                setattr(user, field, value)
+            logger.info(f"Updated existing user profile for User ID #{user.id}")
+                
+        db.commit()
+        db.refresh(user)
 
-    response.set_cookie(
-        key="session_authenticated",
-        value="true",
-        httponly=True,
-        samesite="lax",
-        path="/"
-    )
-    return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
+        response.set_cookie(
+            key="session_authenticated",
+            value="true",
+            httponly=True,
+            samesite="lax",
+            path="/"
+        )
+        return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving user profile: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database profile update failed: {str(e)}")
 
 
 # --- User Profile & Data Endpoints ---
@@ -300,24 +319,36 @@ async def get_user_profile(
 @app.post("/api/staff/register")
 async def register_staff_account(data: StaffRegisterSchema, request: Request, db: Session = Depends(get_db)):
     client_ip = extract_client_ip(request)
-    existing = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
-    if existing:
-        log_auth_event("STAFF_REGISTER", data.email, "FAILED", client_ip, "Duplicate email")
-        raise HTTPException(status_code=400, detail="Staff account with this email already exists.")
-    
-    hashed_password = hash_password(data.password)
-    new_staff = StaffProfile(
-        email=data.email,
-        full_name=data.full_name,
-        assigned_pincode=data.assigned_pincode,
-        password_hash=hashed_password
-    )
-    db.add(new_staff)
-    db.commit()
-    db.refresh(new_staff)
-    
-    log_auth_event("STAFF_REGISTER", data.email, "SUCCESS", client_ip, f"Assigned PIN: {data.assigned_pincode}")
-    return {"status": "success", "message": "Staff registered successfully!", "staff_id": new_staff.id}
+    logger.info(f"Attempting staff registration for: {data.email} | PIN: {data.assigned_pincode}")
+
+    try:
+        existing = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
+        if existing:
+            log_auth_event("STAFF_REGISTER", data.email, "FAILED", client_ip, "Duplicate email")
+            raise HTTPException(status_code=400, detail="Staff account with this email already exists.")
+        
+        hashed_password = hash_password(data.password)
+        new_staff = StaffProfile(
+            email=data.email,
+            full_name=data.full_name,
+            assigned_pincode=data.assigned_pincode,
+            password_hash=hashed_password
+        )
+        db.add(new_staff)
+        db.commit()
+        db.refresh(new_staff)
+        
+        log_auth_event("STAFF_REGISTER", data.email, "SUCCESS", client_ip, f"Assigned PIN: {data.assigned_pincode}")
+        return {"status": "success", "message": "Staff registered successfully!", "staff_id": new_staff.id}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Schema insertion error on StaffProfile: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Staff registration failed due to database schema error: {str(e)}"
+        )
 
 @app.post("/api/staff/login")
 async def login_staff_account(data: StaffLoginSchema, request: Request, db: Session = Depends(get_db)):
@@ -590,8 +621,8 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
                 "entry_id": r.entry_id,
                 "user_id": r.user_id,
                 "waste_category": r.waste_category,
-                "weight_kg": r.weight_kg,
-                "payout_amount": r.payout_amount,
+                "weight_kg": float(r.weight_kg),
+                "payout_amount": float(r.payout_amount),
                 "status": getattr(r, "status", "pending")
             }
             for r in records
