@@ -6,12 +6,14 @@ import traceback
 import bcrypt
 from typing import Optional
 
+# Pydantic Imports
+from pydantic import BaseModel, EmailStr
+
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, EmailStr
 import redis.asyncio as redis
 
 # Database Imports
@@ -64,30 +66,32 @@ redis_client = redis.from_url(redis_url, decode_responses=True)
 app = FastAPI(title="EcoRecycle API")
 app.add_middleware(PerformanceLoggingMiddleware)
 
-# --- Middleware for Deep Payload and Request Inspection ---
 # --- Global Middleware for Route Scope Cookie Enforcement ---
 
 @app.middleware("http")
 async def enforce_strict_route_cookie_scopes(request: Request, call_next):
     path = request.url.path
-    response = await call_next(request)
 
-    # Do not clear cookies on static assets or API endpoints
+    # Do not clear cookies on static assets or API endpoints (e.g. PDF receipt generation)
     if path.startswith("/static") or path.startswith("/api"):
-        return response
+        return await call_next(request)
+
+    response = await call_next(request)
 
     allowed_user_paths = ["/payment", "/pending-payments", "/reviewed-requests"]
     allowed_staff_paths = ["/staff-dashboard"]
 
-    # If user is visiting a route that is NOT a protected user route, strip user cookie
-    if path not in allowed_user_paths:
-        response.delete_cookie(key="user_authenticated", path="/")
-
-    # If user is visiting a route that is NOT a protected staff route, strip staff cookie
-    if path not in allowed_staff_paths:
+    # Strictly strip staff credentials when navigating onto user page routes
+    if path in allowed_user_paths:
         response.delete_cookie(key="staff_authenticated", path="/")
 
+    # Strictly strip user credentials when navigating onto staff page routes
+    if path in allowed_staff_paths:
+        response.delete_cookie(key="user_authenticated", path="/")
+
     return response
+
+# --- Middleware for Deep Payload and Request Inspection ---
 
 @app.middleware("http")
 async def inspect_incoming_requests(request: Request, call_next):
@@ -233,10 +237,9 @@ async def serve_login():
 
 @app.get("/payment")
 async def serve_payment(
-    user_authenticated: Optional[str] = Cookie(None),
-    staff_authenticated: Optional[str] = Cookie(None)
+    user_authenticated: Optional[str] = Cookie(None)
 ):
-    if user_authenticated != "true" or staff_authenticated == "true":
+    if user_authenticated != "true":
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/payment.html", headers=NO_CACHE_HEADERS)
 
@@ -246,19 +249,17 @@ async def serve_register_payment():
 
 @app.get("/pending-payments")
 async def serve_pending_payments(
-    user_authenticated: Optional[str] = Cookie(None),
-    staff_authenticated: Optional[str] = Cookie(None)
+    user_authenticated: Optional[str] = Cookie(None)
 ):
-    if user_authenticated != "true" or staff_authenticated == "true":
+    if user_authenticated != "true":
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/pending_payments.html", headers=NO_CACHE_HEADERS)
 
 @app.get("/reviewed-requests")
 async def serve_reviewed_requests(
-    user_authenticated: Optional[str] = Cookie(None),
-    staff_authenticated: Optional[str] = Cookie(None)
+    user_authenticated: Optional[str] = Cookie(None)
 ):
-    if user_authenticated != "true" or staff_authenticated == "true":
+    if user_authenticated != "true":
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/reviewed_requests.html", headers=NO_CACHE_HEADERS)
 
@@ -280,11 +281,10 @@ async def serve_staff_login():
 
 @app.get("/staff-dashboard")
 async def serve_staff_dashboard(
-    user_authenticated: Optional[str] = Cookie(None),
     staff_authenticated: Optional[str] = Cookie(None)
 ):
-    logger.info(f"🛡️ [STAFF DASHBOARD CHECK] staff_authenticated={staff_authenticated} | user_authenticated={user_authenticated}")
-    if staff_authenticated != "true" or user_authenticated == "true":
+    logger.info(f"🛡️ [STAFF DASHBOARD CHECK] staff_authenticated={staff_authenticated}")
+    if staff_authenticated != "true":
         logger.warning("🔒 [STAFF DASHBOARD ACCESS REJECTED] Redirecting to /staff-login")
         return RedirectResponse(url="/staff-login", status_code=status.HTTP_303_SEE_OTHER)
     return FileResponse("webpages/staff_dashboard.html", headers=NO_CACHE_HEADERS)
@@ -397,7 +397,6 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
             samesite="lax",
             path="/"
         )
-        response.delete_cookie(key="staff_authenticated", path="/")
         return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
     except Exception as e:
         db.rollback()
@@ -487,7 +486,7 @@ async def register_staff_account(data: StaffRegisterSchema, request: Request, db
             status_code=500, 
             detail=f"Staff registration failed due to database schema error: {str(e)}"
         )
-        
+
 @app.post("/api/staff/login")
 async def login_staff_account(data: StaffLoginSchema, request: Request, db: Session = Depends(get_db)):
     client_ip = extract_client_ip(request)
@@ -799,6 +798,7 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
         )
 
 # --- Household Pending Trash Entries for Staff Review ---
+
 @app.get("/api/admin/user-pending-entries/{user_id}")
 async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
     logger.info(f"📋 [USER PENDING ENTRIES] Fetching pending entries for User ID #{user_id}")
@@ -863,6 +863,7 @@ async def download_receipt(entry_id: int, db: Session = Depends(get_db)):
     )
 
 # --- REVIEW (Approve / Decline) Waste Entry ---
+
 @app.post("/api/staff/entries/{entry_id}/review")
 async def review_recycling_entry(
     entry_id: int, 
