@@ -59,9 +59,10 @@ def generate_receipt_pdf(data: Union[Dict[str, Any], Any]) -> bytes:
         weight_kg = "0.00 kg"
 
     try:
-        payout_amount = f"₹{float(get_val('payout_amount', 0.0)):.2f}"
+        # Use standard ASCII 'Rs. ' to prevent Helvetica font glyph box rendering issues
+        payout_amount = f"Rs. {float(get_val('payout_amount', 0.0)):.2f}"
     except (ValueError, TypeError):
-        payout_amount = "₹0.00"
+        payout_amount = "Rs. 0.00"
 
     status = str(get_val("status", "Pending")).capitalize()
     station_id = get_val("station_id", "BIN-LOCAL-01")
