@@ -14,60 +14,78 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
 
-    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-8">
+    <main class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-8">
         <!-- Back to Home Link -->
         <a href="/" class="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-emerald-400 transition mb-6">
             <i class="fa-solid fa-arrow-left"></i> Back to Home
         </a>
 
+        <!-- Header -->
         <div class="text-center mb-8">
             <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 mb-4">
-                <i class="fa-solid fa-lock text-2xl"></i>
+                <i class="fa-solid fa-shield-halved text-2xl"></i>
             </div>
-            <h1 class="text-2xl font-bold text-white">Staff Portal Login</h1>
-            <p class="text-slate-400 text-sm mt-1" id="portalSubtitle">Staff Credentials Authentication</p>
+            <h1 class="text-2xl font-bold text-white tracking-tight">Staff Portal Login</h1>
+            <p class="text-slate-400 text-xs mt-1" id="portalSubtitle">Verify staff credentials to request authorization OTP.</p>
         </div>
 
-        <!-- Step 1: Initial Login Form -->
+        <!-- Error Message Placeholder -->
+        <div id="errorMessage" class="text-rose-400 text-xs text-center mb-4 font-medium empty:hidden bg-rose-500/10 border border-rose-500/30 p-2.5 rounded-xl"></div>
+
+        <!-- Step 1: Password Login Form -->
         <form id="staffLoginForm" class="space-y-4">
-            <div id="credentialsSection" class="space-y-4">
-                <div>
-                    <label for="loginEmail" class="block text-sm font-medium text-slate-300 mb-1">Official Email</label>
-                    <input type="email" id="loginEmail" required placeholder="officer@ecorecycle.gov"
-                           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition">
-                </div>
-
-                <div>
-                    <label for="loginPassword" class="block text-sm font-medium text-slate-300 mb-1">Password</label>
-                    <input type="password" id="loginPassword" required placeholder="••••••••"
-                           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500 transition">
-                </div>
-
-                <button type="submit" id="staffLoginSubmitBtn"
-                        class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
-                    Log In to Dashboard
-                </button>
-            </div>
-        </form>
-
-        <!-- Step 2: Hidden OTP Verification Form -->
-        <form id="staffOtpForm" class="space-y-4 hidden">
             <div>
-                <label for="otpCode" class="block text-sm font-medium text-slate-300 mb-1 text-center">Verification Code</label>
-                <input type="text" id="otpCode" maxlength="6" required placeholder="123456"
-                       class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-center text-2xl tracking-widest text-white focus:outline-none focus:border-emerald-500 transition">
+                <label for="loginEmail" class="block text-xs font-semibold text-slate-300 mb-1.5">Official Email</label>
+                <div class="relative">
+                    <input type="email" id="loginEmail" required placeholder="officer@ecorecycle.gov"
+                           class="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
+                    <i class="fa-solid fa-envelope absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+                </div>
             </div>
 
-            <button type="submit" id="verifyOtpBtn"
-                    class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-slate-900 font-bold py-3 rounded-lg transition shadow-lg shadow-emerald-500/20">
-                Verify OTP & Access Portal
+            <div>
+                <label for="loginPassword" class="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
+                <div class="relative">
+                    <input type="password" id="loginPassword" required placeholder="••••••••"
+                           class="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
+                    <i class="fa-solid fa-lock absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+                </div>
+            </div>
+
+            <button type="submit" id="staffLoginSubmitBtn"
+                    class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
+                <i class="fa-solid fa-paper-plane text-xs"></i> Authenticate & Send Code
             </button>
         </form>
 
-        <div class="mt-6 text-center text-sm text-slate-400">
-            Need a staff account? <a href="/register-staff" class="text-emerald-400 hover:underline">Register here</a>
+        <!-- Step 2: Inline OTP Section (Reveals under credentials) -->
+        <form id="staffOtpForm" class="space-y-4 hidden mt-6 pt-6 border-t border-slate-800">
+            <div>
+                <label for="otpCode" class="block text-xs font-semibold text-slate-300 mb-1.5 text-center">Enter 6-Digit Code</label>
+                <input type="text" id="otpCode" maxlength="6" pattern="\d{6}" required placeholder="000000"
+                       class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-xl font-mono tracking-widest text-white focus:outline-none focus:border-emerald-500 transition">
+            </div>
+
+            <!-- OTP Timer and Attempts Display -->
+            <div class="text-center flex flex-col items-center gap-1">
+                <span id="otpTimer" class="text-xs text-slate-400 font-medium"></span>
+                <span id="otpAttempts" class="text-xs text-amber-400 font-medium hidden"></span>
+            </div>
+
+            <button type="submit" id="verifyOtpBtn"
+                    class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
+                <i class="fa-solid fa-right-to-bracket text-xs"></i> Verify OTP & Access Portal
+            </button>
+
+            <button type="button" id="changeCredentialsBtn" class="w-full bg-transparent hover:bg-slate-800 text-slate-400 text-xs py-2 rounded-xl transition">
+                ← Re-enter Password
+            </button>
+        </form>
+
+        <div class="mt-6 text-center text-xs text-slate-500">
+            Need a staff account? <a href="/register-staff" class="text-emerald-400 hover:underline font-medium">Register here</a>
         </div>
-    </div>
+    </main>
 
     <script src="/static/js/staff_login.js"></script>
 </body>
