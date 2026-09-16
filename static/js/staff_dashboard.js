@@ -13,9 +13,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
 async function loadDistrictProfiles(searchQuery = "", exactPin = "") {
-    const staffEmail = localStorage.getItem("staff_email") || "nkeerthiganesh@gmail.com";
-    const staffPincode = localStorage.getItem("assigned_pincode") || "64109";
+    const staffEmail = localStorage.getItem("staff_email") || getCookie("staff_email") || "nkeerthiganesh@gmail.com";
+    const staffPincode = localStorage.getItem("assigned_pincode") || getCookie("staff_pincode") || "64109";
     
     // Update Header Info Elements safely
     const officerEmailEl = document.getElementById("officerEmail");
@@ -27,10 +34,10 @@ async function loadDistrictProfiles(searchQuery = "", exactPin = "") {
     if (prefixEl) prefixEl.textContent = staffPincode.substring(0, 3);
 
     // Get table body by matching ID (supports both householdProfilesTbody and staffProfilesTbody)
-    const tbody = document.getElementById("householdProfilesTbody") || document.getElementById("staffProfilesTbody");
+    const tbody = document.getElementById("householdProfilesTbody") || document.getElementById("staffProfilesTbody") || document.getElementById("districtUsersList");
     
     if (!tbody) {
-        console.error("Table body element not found in DOM.");
+        console.error("Table body or container element not found in DOM.");
         return;
     }
 
@@ -40,12 +47,18 @@ async function loadDistrictProfiles(searchQuery = "", exactPin = "") {
 
     try {
         const res = await fetch(url);
+
+        if (res.status === 401 || res.status === 403) {
+            window.location.href = "/staff-login";
+            return;
+        }
+
         const data = await res.json();
         
         // Update total profiles count badge if present
         const countBadge = document.getElementById("profilesCountBadge");
         if (countBadge) {
-            countBadge.textContent = `${data.count || 0} found`;
+            countBadge.textContent = `${data.count || (data.profiles ? data.profiles.length : 0)} found`;
         }
 
         tbody.innerHTML = "";
@@ -213,6 +226,26 @@ async function reviewEntry(event, entryId, action) {
         }
     } catch (err) {
         console.error("Failed to review entry:", err);
+    }
+}
+
+async function reviewUser(userId, action) {
+    try {
+        const res = await fetch(`/api/staff/users/${userId}/review`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: action })
+        });
+
+        if (res.ok) {
+            alert(`User ID #${userId} has been ${action}d successfully.`);
+            loadDistrictProfiles();
+        } else {
+            const err = await res.json();
+            alert("Review failed: " + (err.detail || "Server error"));
+        }
+    } catch (err) {
+        console.error("User review error:", err);
     }
 }
 

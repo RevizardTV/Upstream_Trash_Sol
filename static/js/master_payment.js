@@ -35,9 +35,9 @@ function getAuthParam() {
     const userId = localStorage.getItem("user_id");
     const verifiedEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
 
+    // Allow fallback for cookie-authenticated sessions
     if (!userId && !verifiedEmail) {
-        window.location.href = "/login";
-        return null;
+        return "";
     }
     return userId ? `user_id=${userId}` : `email=${encodeURIComponent(verifiedEmail)}`;
 }
@@ -68,20 +68,24 @@ window.showTip = function(category) {
 // 1. Profile & Dashboard Summary Retrieval API
 async function loadDashboardMetrics() {
     const param = getAuthParam();
-    if (!param) return;
+    const queryStr = param ? `?${param}` : "";
 
     // Fetch Profile Name & Email
     try {
-        const profileRes = await fetch(`/api/user/profile?${param}`);
+        const profileRes = await fetch(`/api/user/profile${queryStr}`);
         if (profileRes.ok) {
             const profileData = await profileRes.json();
-            const name = profileData.profile?.full_name || "User";
-            const email = profileData.profile?.email || "";
+            const profile = profileData.profile || {};
+            const name = profile.full_name || "User";
+            const email = profile.email || "";
             
-            const nameEl = document.getElementById("profileName");
-            const emailEl = document.getElementById("profileEmail");
+            const nameEl = document.getElementById("profileName") || document.getElementById("userNameDisplay");
+            const emailEl = document.getElementById("profileEmail") || document.getElementById("userEmailDisplay");
+            const upiEl = document.getElementById("userUpiDisplay");
+
             if (nameEl) nameEl.textContent = name;
             if (emailEl) emailEl.textContent = email;
+            if (upiEl) upiEl.textContent = profile.upi_id || "Not Linked";
         }
     } catch (err) {
         console.error("Failed to load user profile name:", err);
@@ -89,7 +93,7 @@ async function loadDashboardMetrics() {
 
     // Fetch Metrics Summary
     try {
-        const response = await fetch(`/api/recycling/summary?${param}`);
+        const response = await fetch(`/api/recycling/summary${queryStr}`);
         const result = await response.json();
 
         if (response.ok && result.status === "success") {
@@ -113,13 +117,14 @@ async function loadDashboardMetrics() {
 // 2. Pending Queue Data Fetcher API
 async function loadPendingPayments() {
     const param = getAuthParam();
-    if (!param) return;
+    const queryStr = param ? `?${param}` : "";
 
     const tableBody = document.getElementById("pendingPaymentsTableBody");
+    const container = document.getElementById("pendingPaymentsContainer");
     const totalDisplay = document.getElementById("totalPendingAmount");
 
     try {
-        const response = await fetch(`/api/recycling/pending-payments?${param}`);
+        const response = await fetch(`/api/recycling/pending-payments${queryStr}`);
         const result = await response.json();
 
         if (!response.ok || result.status !== "success") {
@@ -130,6 +135,7 @@ async function loadPendingPayments() {
             totalDisplay.textContent = `₹${result.total_pending_amount.toFixed(2)}`;
         }
 
+        // Render to Table if available
         if (tableBody) {
             if (result.entries.length === 0) {
                 tableBody.innerHTML = `
@@ -138,24 +144,47 @@ async function loadPendingPayments() {
                             No pending recycling payouts found.
                         </td>
                     </tr>`;
-                return;
+            } else {
+                tableBody.innerHTML = result.entries.map(entry => {
+                    const formattedDate = entry.created_at 
+                        ? new Date(entry.created_at).toLocaleDateString() 
+                        : "N/A";
+
+                    return `
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-800/40">
+                            <td class="p-4 text-emerald-400 font-mono font-medium">#${entry.entry_id}</td>
+                            <td class="p-4 text-slate-300 capitalize">${entry.waste_category}</td>
+                            <td class="p-4 text-slate-300">${entry.weight_kg} kg</td>
+                            <td class="p-4 font-bold text-emerald-400">₹${entry.payout_amount.toFixed(2)}</td>
+                            <td class="p-4 text-slate-400 text-xs font-mono">${formattedDate}</td>
+                        </tr>
+                    `;
+                }).join("");
             }
+        }
 
-            tableBody.innerHTML = result.entries.map(entry => {
-                const formattedDate = entry.created_at 
-                    ? new Date(entry.created_at).toLocaleDateString() 
-                    : "N/A";
-
-                return `
-                    <tr class="border-b border-slate-700/50 hover:bg-slate-800/40">
-                        <td class="p-4 text-emerald-400 font-mono font-medium">#${entry.entry_id}</td>
-                        <td class="p-4 text-slate-300 capitalize">${entry.waste_category}</td>
-                        <td class="p-4 text-slate-300">${entry.weight_kg} kg</td>
-                        <td class="p-4 font-bold text-emerald-400">₹${entry.payout_amount.toFixed(2)}</td>
-                        <td class="p-4 text-slate-400 text-xs font-mono">${formattedDate}</td>
-                    </tr>
-                `;
-            }).join("");
+        // Render to Mobile Container view if present
+        if (container) {
+            container.innerHTML = "";
+            if (result.entries.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 text-center py-4">No pending transactions found.</p>`;
+            } else {
+                result.entries.forEach(item => {
+                    const row = document.createElement("div");
+                    row.className = "flex justify-between items-center p-3 bg-slate-800 rounded-lg mb-2 border border-slate-700";
+                    row.innerHTML = `
+                        <div>
+                            <p class="font-bold text-white capitalize">${item.waste_category}</p>
+                            <p class="text-xs text-slate-400">Weight: ${item.weight_kg} kg | Status: <span class="text-amber-400 font-semibold">${item.status}</span></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-mono text-emerald-400 font-bold">₹${parseFloat(item.payout_amount).toFixed(2)}</p>
+                            ${item.status === 'approved' ? `<a href="/api/recycling/receipt/${item.entry_id}" class="text-xs text-indigo-400 hover:underline">Receipt PDF</a>` : ''}
+                        </div>
+                    `;
+                    container.appendChild(row);
+                });
+            }
         }
     } catch (err) {
         console.error("Error fetching pending payments:", err);
@@ -173,10 +202,10 @@ async function loadPendingPayments() {
 // 3. Reviewed Requests Data Fetcher API
 async function loadReviewedRequests() {
     const param = getAuthParam();
-    if (!param) return;
+    const queryStr = param ? `?${param}` : "";
 
     try {
-        const res = await fetch(`/api/recycling/reviewed-requests?${param}`);
+        const res = await fetch(`/api/recycling/reviewed-requests${queryStr}`);
         const data = await res.json();
 
         if (res.ok && data.status === "success") {
@@ -312,30 +341,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (!userId) {
                 const verifiedEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
-                if (verifiedEmail) {
-                    try {
-                        const profileRes = await fetch(`/api/user/profile?email=${encodeURIComponent(verifiedEmail)}`);
-                        if (profileRes.ok) {
-                            const profileData = await profileRes.json();
-                            if (profileData?.profile?.id) {
-                                userId = profileData.profile.id;
-                                localStorage.setItem("user_id", userId);
-                            }
+                try {
+                    const queryStr = verifiedEmail ? `?email=${encodeURIComponent(verifiedEmail)}` : "";
+                    const profileRes = await fetch(`/api/user/profile${queryStr}`);
+                    if (profileRes.ok) {
+                        const profileData = await profileRes.json();
+                        if (profileData?.profile?.id) {
+                            userId = profileData.profile.id;
+                            localStorage.setItem("user_id", userId);
                         }
-                    } catch (err) {
-                        console.error("User resolution error:", err);
                     }
+                } catch (err) {
+                    console.error("User resolution error:", err);
                 }
-            }
-
-            if (!userId) {
-                alert("Unable to verify user profile. Please log in first.");
-                return;
             }
 
             // Payload constructed with Station ID and Target Payout Account
             const payload = {
-                user_id: parseInt(userId),
+                user_id: userId ? parseInt(userId) : null,
                 waste_category: wasteCategory,
                 weight_kg: weight,
                 payout_amount: payout,
