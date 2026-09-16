@@ -339,24 +339,15 @@ async def verify_otp_route(data: OTPVerify, request: Request, db: Session = Depe
             }
         )
 
-        if is_staff:
-            response.set_cookie(
-                key="staff_authenticated",
-                value="true",
-                httponly=False,
-                samesite="lax",
-                path="/"
-            )
-            response.delete_cookie(key="user_authenticated", path="/")
-        else:
-            response.set_cookie(
+
+        response.set_cookie(
                 key="user_authenticated",
                 value="true",
                 httponly=False,
                 samesite="lax",
                 path="/"
             )
-            response.delete_cookie(key="staff_authenticated", path="/")
+        response.delete_cookie(key="staff_authenticated", path="/")
 
         return response
     except Exception as e:
