@@ -1,30 +1,17 @@
-/**
- * AuthGuard - Validates authentication state against backend endpoints 
- * rather than relying on tamperable sessionStorage values.
- */
-(async function checkAuthSession() {
-    const currentPath = window.location.pathname;
+(function () {
+    // 1. Fetch all possible auth indicators
+    const userId = localStorage.getItem("user_id");
+    const email = localStorage.getItem("email") || localStorage.getItem("verified_email");
+    
+    // Check cookies for session/user_id
+    const hasSessionCookie = document.cookie.split(";").some(item => {
+        const cookie = item.trim();
+        return cookie.startsWith("session=") || cookie.startsWith("user_id=");
+    });
 
-    // Endpoints that do not require authentication checks
-    const publicPaths = ["/", "/login", "/register-profile", "/register-staff", "/staff-login"];
-    if (publicPaths.includes(currentPath)) return;
-
-    try {
-        let checkEndpoint = "/api/user/profile";
-        if (currentPath.includes("staff")) {
-            checkEndpoint = "/api/admin/district-users?staff_pincode=000"; // Light verification route for staff
-        }
-
-        const response = await fetch(checkEndpoint, {
-            method: "GET",
-            headers: { "Cache-Control": "no-cache" }
-        });
-
-        if (response.status === 401 || response.status === 403) {
-            console.warn("Unauthorized session detected by server. Redirecting...");
-            window.location.href = currentPath.includes("staff") ? "/staff-login" : "/login";
-        }
-    } catch (err) {
-        console.error("AuthGuard session check error:", err);
+    // 2. If NO valid auth indicators are found, redirect immediately
+    if (!userId && !email && !hasSessionCookie) {
+        // Use location.replace so the user cannot click 'Back' to return to this page
+        window.location.replace("/login");
     }
 })();
