@@ -327,27 +327,42 @@ async def verify_otp_route(data: OTPVerify, request: Request, db: Session = Depe
     try:
         await process_otp_verification(data.email_address, data.otp_code, client_ip)
         
-        # Check if the verifying email belongs to staff
+        # 1. Check if email exists in staff_profiles
         is_staff = db.query(StaffProfile).filter(StaffProfile.email == data.email_address).first()
-        logger.info(f"✅ [OTP VERIFY SUCCESS] Granted session to {data.email_address} (Is Staff: {bool(is_staff)})")
+        
+        # 2. Check if email exists in user_profiles
+        is_user = db.query(UserProfile).filter(UserProfile.email == data.email_address).first()
+        
+        logger.info(f"✅ [OTP VERIFY SUCCESS] Granted session to {data.email_address} (Is Staff: {bool(is_staff)} | Is User: {bool(is_user)})")
 
         response = JSONResponse(
             content={
                 "status": "success", 
                 "message": "OTP verified successfully.",
-                "is_staff": bool(is_staff)
+                "is_staff": bool(is_staff),
+                "is_user": bool(is_user)
             }
         )
 
+        # Issue staff cookie if they exist in staff_profiles
+        if is_staff:
+            response.set_cookie(
+                key="staff_authenticated",
+                value="true",
+                httponly=False,
+                samesite="lax",
+                path="/"
+            )
 
-        response.set_cookie(
+        # Issue user cookie ONLY if they exist in user_profiles
+        if is_user:
+            response.set_cookie(
                 key="user_authenticated",
                 value="true",
                 httponly=False,
                 samesite="lax",
                 path="/"
             )
-        response.delete_cookie(key="staff_authenticated", path="/")
 
         return response
     except Exception as e:
