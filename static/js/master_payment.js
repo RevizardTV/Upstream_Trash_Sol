@@ -3,8 +3,6 @@
  */
 
 // --- GLOBAL FETCH AUTHENTICATION INTERCEPTOR ---
-// Automatically catches 401 Unauthorized responses from backend API calls
-// and forces a redirect to the login page.
 (function () {
     const originalFetch = window.fetch;
 
@@ -35,22 +33,18 @@ function getAuthParam() {
     const userId = localStorage.getItem("user_id");
     const verifiedEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
 
-    // Allow fallback for cookie-authenticated sessions
     if (!userId && !verifiedEmail) {
         return "";
     }
     return userId ? `user_id=${encodeURIComponent(userId)}` : `email=${encodeURIComponent(verifiedEmail)}`;
 }
 
-// Global Logout Action
-// Revokes backend session in Redis and clears cookies via server redirect
 window.logout = function() {
     localStorage.clear();
     sessionStorage.clear();
     window.location.href = "/logout";
 };
 
-// Global Tip Popup Activator
 window.showTip = function(category) {
     const panel = document.getElementById("infoPanel");
     const title = document.getElementById("infoTitle");
@@ -64,8 +58,6 @@ window.showTip = function(category) {
 };
 
 // --- API DATA LOADERS ---
-
-// 1. Profile & Dashboard Summary Retrieval API
 async function loadDashboardMetrics() {
     const param = getAuthParam();
     if (!param && !document.cookie.includes("session=")) {
@@ -75,7 +67,6 @@ async function loadDashboardMetrics() {
 
     const queryStr = param ? `?${param}` : "";
 
-    // Fetch Profile Name & Email
     try {
         const profileRes = await fetch(`/api/user/profile${queryStr}`);
         if (profileRes.ok) {
@@ -96,7 +87,6 @@ async function loadDashboardMetrics() {
         console.error("Failed to load user profile name:", err);
     }
 
-    // Fetch Metrics Summary
     try {
         const response = await fetch(`/api/recycling/summary${queryStr}`);
         const result = await response.json();
@@ -119,7 +109,6 @@ async function loadDashboardMetrics() {
     }
 }
 
-// 2. Pending Queue Data Fetcher API
 async function loadPendingPayments() {
     const param = getAuthParam();
     if (!param && !document.cookie.includes("session=")) {
@@ -145,7 +134,6 @@ async function loadPendingPayments() {
             totalDisplay.textContent = `₹${result.total_pending_amount.toFixed(2)}`;
         }
 
-        // Render to Table if available
         if (tableBody) {
             if (result.entries.length === 0) {
                 tableBody.innerHTML = `
@@ -160,12 +148,17 @@ async function loadPendingPayments() {
                         ? new Date(entry.created_at).toLocaleDateString() 
                         : "N/A";
 
+                    const isCharge = entry.payout_amount < 0;
+                    const displayAmt = Math.abs(entry.payout_amount).toFixed(2);
+                    const amtClass = isCharge ? "text-rose-400 font-bold" : "text-emerald-400 font-bold";
+                    const prefix = isCharge ? "-₹" : "+₹";
+
                     return `
                         <tr class="border-b border-slate-700/50 hover:bg-slate-800/40">
                             <td class="p-4 text-emerald-400 font-mono font-medium">#${entry.entry_id}</td>
                             <td class="p-4 text-slate-300 capitalize">${entry.waste_category}</td>
                             <td class="p-4 text-slate-300">${entry.weight_kg} kg</td>
-                            <td class="p-4 font-bold text-emerald-400">₹${entry.payout_amount.toFixed(2)}</td>
+                            <td class="p-4 ${amtClass}">${prefix}${displayAmt}</td>
                             <td class="p-4 text-slate-400 text-xs font-mono">${formattedDate}</td>
                         </tr>
                     `;
@@ -173,7 +166,6 @@ async function loadPendingPayments() {
             }
         }
 
-        // Render to Mobile Container view if present
         if (container) {
             container.innerHTML = "";
             if (result.entries.length === 0) {
@@ -182,13 +174,17 @@ async function loadPendingPayments() {
                 result.entries.forEach(item => {
                     const row = document.createElement("div");
                     row.className = "flex justify-between items-center p-3 bg-slate-800 rounded-lg mb-2 border border-slate-700";
+                    const isCharge = item.payout_amount < 0;
+                    const amtClass = isCharge ? "text-rose-400 font-bold" : "text-emerald-400 font-bold";
+                    const prefix = isCharge ? "-₹" : "+₹";
+
                     row.innerHTML = `
                         <div>
                             <p class="font-bold text-white capitalize">${item.waste_category}</p>
                             <p class="text-xs text-slate-400">Weight: ${item.weight_kg} kg | Status: <span class="text-amber-400 font-semibold">${item.status}</span></p>
                         </div>
                         <div class="text-right">
-                            <p class="font-mono text-emerald-400 font-bold">₹${parseFloat(item.payout_amount).toFixed(2)}</p>
+                            <p class="font-mono ${amtClass}">${prefix}${Math.abs(item.payout_amount).toFixed(2)}</p>
                             ${item.status === 'approved' ? `<a href="/api/recycling/receipt/${item.entry_id}" class="text-xs text-indigo-400 hover:underline">Receipt PDF</a>` : ''}
                         </div>
                     `;
@@ -209,7 +205,6 @@ async function loadPendingPayments() {
     }
 }
 
-// 3. Reviewed Requests Data Fetcher API
 async function loadReviewedRequests() {
     const param = getAuthParam();
     if (!param && !document.cookie.includes("session=")) {
@@ -239,16 +234,19 @@ async function loadReviewedRequests() {
 
             data.entries.forEach(entry => {
                 const isApproved = entry.status === "approved";
+                const isCharge = entry.payout_amount < 0;
                 const statusBadge = isApproved
                     ? `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full text-xs font-semibold">Approved</span>`
                     : `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-full text-xs font-semibold">Declined</span>`;
 
-                // Download button rendering for approved transactions
                 const downloadBtn = isApproved 
                     ? `<a href="/api/recycling/receipt/${entry.entry_id}" download class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-lg text-xs font-medium transition">
                         <i class="fa-solid fa-file-pdf"></i> Receipt
                     </a>`
                     : `<span class="text-xs text-slate-500">${entry.rejection_reason || 'N/A'}</span>`;
+
+                const amtClass = isCharge ? 'text-rose-400' : 'text-emerald-400';
+                const prefix = isCharge ? '-₹' : '+₹';
 
                 const tr = document.createElement("tr");
                 tr.className = "border-b border-slate-700/40 hover:bg-slate-800/40 transition";
@@ -256,7 +254,7 @@ async function loadReviewedRequests() {
                     <td class="py-3.5 px-4 font-mono text-slate-400">#${entry.entry_id}</td>
                     <td class="py-3.5 px-4 font-semibold text-white capitalize">${entry.waste_category}</td>
                     <td class="py-3.5 px-4 font-mono text-slate-300">${entry.weight_kg.toFixed(2)} kg</td>
-                    <td class="py-3.5 px-4 font-bold ${isApproved ? 'text-emerald-400' : 'text-slate-400'}">₹${entry.payout_amount.toFixed(2)}</td>
+                    <td class="py-3.5 px-4 font-bold ${isApproved ? amtClass : 'text-slate-400'}">${prefix}${Math.abs(entry.payout_amount).toFixed(2)}</td>
                     <td class="py-3.5 px-4">${statusBadge}</td>
                     <td class="py-3.5 px-4 text-right">${downloadBtn}</td>
                 `;
@@ -270,14 +268,11 @@ async function loadReviewedRequests() {
 
 // --- TAB SWITCHER & ROUTER LOGIC ---
 window.switchTab = function(targetViewId) {
-    // Hide all panels
     document.querySelectorAll('.view-panel').forEach(panel => panel.classList.add('hidden'));
 
-    // Show target panel
     const activePanel = document.getElementById(targetViewId);
     if (activePanel) activePanel.classList.remove('hidden');
 
-    // Update active state on sidebar navigation buttons
     document.querySelectorAll('#spaNav .nav-btn').forEach(btn => {
         if (btn.getAttribute('data-view') === targetViewId) {
             btn.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border', 'border-emerald-500/20');
@@ -288,7 +283,6 @@ window.switchTab = function(targetViewId) {
         }
     });
 
-    // Lazy load dataset depending on the current tab
     if (targetViewId === 'view-options') loadDashboardMetrics();
     if (targetViewId === 'view-pending') loadPendingPayments();
     if (targetViewId === 'view-reviewed') loadReviewedRequests();
@@ -296,7 +290,6 @@ window.switchTab = function(targetViewId) {
 
 // --- FORM CALCULATOR & EVENT INITIALIZATION ---
 document.addEventListener("DOMContentLoaded", () => {
-    // Guard: Verify authentication status before initializing application scripts
     const userId = localStorage.getItem("user_id");
     const verifiedEmail = sessionStorage.getItem("verified_email") || localStorage.getItem("verified_email");
     const hasAuthCookie = document.cookie.split(';').some(c => c.trim().startsWith('session='));
@@ -306,10 +299,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    // Initialize default view state and load metrics
     switchTab('view-options');
 
-    // Attach Sidebar Navigation Events
     document.querySelectorAll('#spaNav .nav-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const viewTarget = btn.getAttribute('data-view');
@@ -317,7 +308,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Form Elements Initialization
     const weightInput = document.getElementById("weightInput");
     const stationInput = document.getElementById("stationInput");
     const radios = document.querySelectorAll('input[name="material"]');
@@ -333,10 +323,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!estDisplay) return;
 
         if (total < 0) {
-            estDisplay.textContent = `-$${Math.abs(total).toFixed(2)} (Fee Charge)`;
+            estDisplay.textContent = `-₹${Math.abs(total).toFixed(2)} (Fee Charge)`;
             estDisplay.className = "text-lg font-bold text-rose-400";
         } else {
-            estDisplay.textContent = `$${total.toFixed(2)} (Payout)`;
+            estDisplay.textContent = `+₹${total.toFixed(2)} (Payout)`;
             estDisplay.className = "text-lg font-bold text-emerald-400";
         }
     }
@@ -344,7 +334,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (weightInput) weightInput.addEventListener("input", calculate);
     radios.forEach(r => r.addEventListener("change", calculate));
 
-    // Register Form Handling & Direct Database Submission
     if (form) {
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
@@ -387,7 +376,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
-            // Payload constructed with Station ID and Target Payout Account
             const payload = {
                 user_id: currentUserId ? parseInt(currentUserId) : null,
                 waste_category: wasteCategory,
@@ -410,7 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     alert(`Drop-off recorded successfully! Entry ID: #${result.entry_id}`);
                     form.reset();
                     calculate();
-                    switchTab('view-pending'); // Automatically switch to Pending Queue on success
+                    switchTab('view-pending');
                 } else {
                     alert(`Submission error: ${result.detail || 'Unknown error'}`);
                 }
