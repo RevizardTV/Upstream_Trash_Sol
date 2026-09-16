@@ -89,18 +89,14 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
 
 @router.post("/wipe-database", dependencies=[Depends(verify_admin_access)])
 async def wipe_database(db: Session = Depends(get_db)):
-    """Purge entries across profiles, staff, and recycling queues (Protected)."""
     try:
         db.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
-        db.execute(text("TRUNCATE TABLE recycling_entries;"))
-        db.execute(text("TRUNCATE TABLE user_profiles;"))
-        db.execute(text("TRUNCATE TABLE staff_profiles;"))
+        db.execute(text("DELETE FROM recycling_entries;"))
+        db.execute(text("DELETE FROM user_profiles;"))
+        db.execute(text("DELETE FROM staff_profiles;"))
         db.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
         db.commit()
-        return {"status": "success", "message": "All user profiles, staff records, and recycling entries purged."}
+        return {"status": "success", "message": "All records purged safely."}
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to wipe database: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
