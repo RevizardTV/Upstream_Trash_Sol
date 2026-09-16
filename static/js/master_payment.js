@@ -249,25 +249,30 @@ async function fetchReviewedRequests() {
             tbody.innerHTML = data.entries.map(e => {
                 const isApproved = e.status === 'approved';
                 const statusBadge = isApproved 
-                    ? `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs px-2.5 py-1 rounded-full font-medium">Approved</span>`
-                    : `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs px-2.5 py-1 rounded-full font-medium" title="${e.rejection_reason || ''}">Declined</span>`;
+                    ? `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-check text-[10px]"></i> Approved
+                       </span>`
+                    : `<span class="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1.5" title="${e.rejection_reason || ''}">
+                        <i class="fa-solid fa-circle-xmark text-[10px]"></i> Declined
+                       </span>`;
 
                 const recordContent = isApproved
-                    ? `<a href="/api/recycling/receipt/${e.entry_id}" target="_blank" class="text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1">
-                        <i class="fa-solid fa-file-arrow-down"></i> Receipt
+                    ? `<a href="/api/recycling/receipt/${e.entry_id}" target="_blank" class="text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 rounded-lg transition inline-flex items-center justify-center gap-2 font-medium">
+                        <i class="fa-solid fa-file-arrow-down text-sm shrink-0"></i> <span>Receipt</span>
                       </a>`
-                    : `<span class="text-xs text-rose-400/90 bg-rose-500/5 border border-rose-500/20 px-2.5 py-1 rounded-lg inline-block text-right">
-                        <i class="fa-solid fa-circle-xmark mr-1"></i>${e.rejection_reason || 'Declined'}
+                    : `<span class="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 font-medium max-w-xs text-left" title="${e.rejection_reason || 'Declined'}">
+                        <i class="fa-solid fa-triangle-exclamation text-xs shrink-0"></i>
+                        <span class="truncate">${e.rejection_reason || 'Declined'}</span>
                       </span>`;
 
                 return `
                     <tr class="border-b border-slate-700/40 hover:bg-slate-800/30 transition">
-                        <td class="py-3 px-4 font-mono text-xs text-slate-400">#${e.entry_id}</td>
-                        <td class="py-3 px-4 font-medium text-white">${e.waste_category}</td>
-                        <td class="py-3 px-4 text-slate-300">${e.weight_kg} kg</td>
-                        <td class="py-3 px-4 font-semibold text-emerald-400">₹${parseFloat(e.payout_amount).toFixed(2)}</td>
-                        <td class="py-3 px-4">${statusBadge}</td>
-                        <td class="py-3 px-4 text-right">${recordContent}</td>
+                        <td class="py-3.5 px-4 font-mono text-xs text-slate-400">#${e.entry_id}</td>
+                        <td class="py-3.5 px-4 font-medium text-white">${e.waste_category}</td>
+                        <td class="py-3.5 px-4 text-slate-300">${e.weight_kg} kg</td>
+                        <td class="py-3.5 px-4 font-semibold text-emerald-400">₹${parseFloat(e.payout_amount).toFixed(2)}</td>
+                        <td class="py-3.5 px-4">${statusBadge}</td>
+                        <td class="py-3.5 px-4 text-right flex justify-end items-center">${recordContent}</td>
                     </tr>
                 `;
             }).join('');
