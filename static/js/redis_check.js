@@ -2,7 +2,7 @@
  * Global Redis Inspection & Management Console Toolkit
  */
 
-const ADMIN_SECRET_KEY = "a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2";
+
 
 // 1. Live Redis Inspector
 window.redis = async function() {
