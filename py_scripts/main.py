@@ -387,7 +387,15 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         "email": staff.email, 
         "assigned_pincode": staff.assigned_pincode
     })
-    response.set_cookie(key="staff_authenticated", value="true", httponly=False, samesite="lax", path="/")
+    
+    # Ensure explicit path and proper samesite settings
+    response.set_cookie(
+        key="staff_authenticated", 
+        value="true", 
+        httponly=False, 
+        samesite="lax", 
+        path="/"
+    )
     response.delete_cookie(key="user_authenticated", path="/")
     response.delete_cookie(key="session_authenticated", path="/")
     return response
