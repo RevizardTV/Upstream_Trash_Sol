@@ -120,10 +120,12 @@ class ProfileCreateSchema(BaseModel):
     upi_id: Optional[str] = None
 
 class RecyclingEntrySchema(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None
     waste_category: str
     weight_kg: float
     payout_amount: float
+    station_id: Optional[str] = None
+    payout_method: Optional[str] = "upi"
 
     class Config:
         from_attributes = True
@@ -155,9 +157,8 @@ async def serve_home():
     return FileResponse("webpages/index.html")
 
 @app.get("/login")
-async def serve_login(session_authenticated: Optional[str] = Cookie(None)):
-    if session_authenticated == "true":
-        return RedirectResponse(url="/payment", status_code=status.HTTP_303_SEE_OTHER)
+async def serve_login():
+    # Removed automatic 303 redirect to prevent endless loop with frontend authguards
     return FileResponse("webpages/login.html")
 
 @app.get("/payment")
@@ -195,9 +196,7 @@ async def serve_register_staff():
     return FileResponse("webpages/register_staff.html")
 
 @app.get("/staff-login")
-async def serve_staff_login(staff_authenticated: Optional[str] = Cookie(None)):
-    if staff_authenticated == "true":
-        return RedirectResponse(url="/staff-dashboard", status_code=status.HTTP_303_SEE_OTHER)
+async def serve_staff_login():
     return FileResponse("webpages/staff_login.html")
 
 @app.get("/staff-dashboard")
@@ -218,7 +217,7 @@ async def logout():
 
 @app.get("/staff-logout")
 async def staff_logout():
-    response = RedirectResponse(url="/staff_login", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse(url="/staff-login", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(key="session_authenticated", path="/")
     response.delete_cookie(key="staff_authenticated", path="/")
     return response
@@ -242,7 +241,7 @@ async def verify_otp_route(data: OTPVerify, request: Request):
     response.set_cookie(
         key="session_authenticated",
         value="true",
-        httponly=True,
+        httponly=False,
         samesite="lax",
         path="/"
     )
@@ -271,7 +270,7 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
         response.set_cookie(
             key="session_authenticated",
             value="true",
-            httponly=True,
+            httponly=False,
             samesite="lax",
             path="/"
         )
@@ -376,8 +375,8 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         "email": staff.email, 
         "assigned_pincode": staff.assigned_pincode
     })
-    response.set_cookie(key="staff_authenticated", value="true", httponly=True, samesite="lax", path="/")
-    response.set_cookie(key="session_authenticated", value="true", httponly=True, samesite="lax", path="/")
+    response.set_cookie(key="staff_authenticated", value="true", httponly=False, samesite="lax", path="/")
+    response.set_cookie(key="session_authenticated", value="true", httponly=False, samesite="lax", path="/")
     return response
 
 @app.post("/api/staff/users/{user_id}/review")
@@ -400,22 +399,29 @@ async def review_user_profile(
 @app.post("/api/recycling/entry")
 async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(get_db)):
     try:
-        user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
+        user = None
+        if data.user_id:
+            user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
+        
         if not user:
             raise HTTPException(status_code=404, detail=f"User ID {data.user_id} not found in user_profiles.")
             
         new_entry = RecyclingEntry(
-            user_id=data.user_id,
+            user_id=user.id,
             waste_category=data.waste_category,
             weight_kg=data.weight_kg,
             payout_amount=data.payout_amount,
             status="pending"
         )
+        if hasattr(new_entry, "station_id"):
+            setattr(new_entry, "station_id", data.station_id)
+
         db.add(new_entry)
         db.commit()
         db.refresh(new_entry)
         
-        log_recycling_action("SUBMIT", data.user_id, data.weight_kg, "PENDING", f"Category: {data.waste_category}")
+        # Use user.id here to satisfy the static type checker
+        log_recycling_action("SUBMIT", user.id, data.weight_kg, "PENDING", f"Category: {data.waste_category}")
         return {
             "status": "success", 
             "message": "Recycling transaction recorded!", 
@@ -461,6 +467,7 @@ async def get_pending_payments(
                 "waste_category": entry.waste_category,
                 "weight_kg": float(entry.weight_kg),
                 "payout_amount": float(entry.payout_amount),
+                "status": getattr(entry, "status", "pending"),
                 "created_at": entry.created_at.isoformat() if getattr(entry, "created_at", None) else None
             }
             for entry in entries
@@ -520,7 +527,7 @@ async def get_user_recycling_summary(
             raise HTTPException(status_code=404, detail="User not found")
         user_id = user.id
 
-    entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).all()
+    entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id).all() if user_id else []
 
     approved_total = sum(float(e.payout_amount) for e in entries if getattr(e, "status", "pending") == "approved")
     pending_total = sum(float(e.payout_amount) for e in entries if getattr(e, "status", "pending") == "pending")
@@ -662,7 +669,7 @@ async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
                 "waste_category": e.waste_category,
                 "weight_kg": float(e.weight_kg),
                 "payout_amount": float(e.payout_amount),
-                "created_at": e.created_at.isoformat() if e.created_at else None
+                "created_at": e.created_at.isoformat() if getattr(e, "created_at", None) else None
             }
             for e in entries
         ]
@@ -670,7 +677,6 @@ async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/recycling/receipt/{entry_id}")
 async def download_receipt(entry_id: int, db: Session = Depends(get_db)):
-    # Perform a joined query across RecyclingEntry and UserProfile
     result = db.query(RecyclingEntry, UserProfile).\
         join(UserProfile, RecyclingEntry.user_id == UserProfile.id).\
         filter(RecyclingEntry.entry_id == entry_id).first()
@@ -680,7 +686,6 @@ async def download_receipt(entry_id: int, db: Session = Depends(get_db)):
 
     entry, user = result
 
-    # Map joined database attributes into structured dynamic payload
     receipt_payload = {
         "entry_id": entry.entry_id,
         "user_name": user.full_name or "Valued Customer",
@@ -690,7 +695,7 @@ async def download_receipt(entry_id: int, db: Session = Depends(get_db)):
         "payout_amount": float(entry.payout_amount) if entry.payout_amount is not None else 0.0,
         "status": getattr(entry, "status", "approved"),
         "station_id": getattr(entry, "station_id", "BIN-DISTRICT-HUB"),
-        "created_at": entry.created_at
+        "created_at": getattr(entry, "created_at", None)
     }
 
     try:
@@ -721,7 +726,9 @@ async def review_recycling_entry(
     new_status = "approved" if data.action == "approve" else "declined"
     
     entry.status = new_status
-    entry.reviewed_by_staff_id = data.staff_id
+    if hasattr(entry, "reviewed_by_staff_id"):
+        setattr(entry, "reviewed_by_staff_id", data.staff_id)
+        
     if data.action == "decline":
         entry.rejection_reason = data.rejection_reason or "Declined by district officer"
         
