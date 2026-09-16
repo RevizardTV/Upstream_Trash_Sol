@@ -1,9 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from py_scripts.database import get_db, UserProfile, RecyclingEntry, StaffProfile
+from py_scripts.config import config
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Debug"])
+
+def verify_admin_access(x_admin_secret: str = Header(None)):
+    """Security dependency ensuring admin actions are signed with server secret."""
+    secret_key = getattr(config, "EM_RESET_KEY", None)
+    if secret_key and x_admin_secret != secret_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Invalid administrative authorization token."
+        )
 
 @router.get("/show-profiles")
 async def show_profiles(db: Session = Depends(get_db)):
@@ -76,11 +86,10 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
             detail=f"Unknown table parameter '{table}'. Supported: 'Profile', 'Staff', 'Trash'."
         )
 
-@router.post("/wipe-database")
+@router.post("/wipe-database", dependencies=[Depends(verify_admin_access)])
 async def wipe_database(db: Session = Depends(get_db)):
-    """Purge entries across profiles, staff, and recycling queues."""
+    """Purge entries across profiles, staff, and recycling queues (Requires Authorization Header)."""
     try:
-        # Disable foreign key checks for clean truncation across tables
         db.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
         db.execute(text("TRUNCATE TABLE recycling_entries;"))
         db.execute(text("TRUNCATE TABLE user_profiles;"))
@@ -98,21 +107,16 @@ async def wipe_database(db: Session = Depends(get_db)):
 @router.get("/district-users")
 async def get_district_users(
     staff_pincode: str = Query(...),
-    search: str = Query(None), # Optional search term for name or email
-    exact_pincode: str = Query(None), # Optional filter for exact 6-digit PIN
+    search: str = Query(None),
+    exact_pincode: str = Query(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Fetch all users within the staff member's sorting district (matching first 3 digits of PIN).
-    Allows searching by user name, email, or exact locality pincode.
-    """
     if len(staff_pincode) < 3:
         raise HTTPException(status_code=400, detail="Staff pincode must be at least 3 digits.")
 
     district_prefix = staff_pincode[:3]
     query = db.query(UserProfile).filter(UserProfile.postal_code.like(f"{district_prefix}%"))
 
-    # Apply search filter if provided (matches user name or email)
     if search:
         search_filter = f"%{search}%"
         query = query.filter(
@@ -120,7 +124,6 @@ async def get_district_users(
             (UserProfile.email.ilike(search_filter))
         )
 
-    # Apply exact pincode filter if provided
     if exact_pincode:
         query = query.filter(UserProfile.postal_code == exact_pincode)
 

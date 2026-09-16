@@ -1,9 +1,9 @@
-from hashlib import sha256
 import json
 import os
 import sys
 import io
 from typing import Optional
+from passlib.context import CryptContext
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,13 +38,18 @@ from py_scripts.logging import (
     logger
 )
 
-# Ensure project directory is in PATH
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Password Hashing Setup
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Auto-create tables on startup
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 Base.metadata.create_all(bind=engine)
 
-# Redis Connection Initialization
 redis_url = os.getenv("REDIS_URL") or getattr(config, "REDIS_URL", None)
 if not redis_url:
     logger.critical("CRITICAL ERROR: REDIS_URL environment variable is missing!")
@@ -52,20 +57,15 @@ if not redis_url:
 
 redis_client = redis.from_url(redis_url, decode_responses=True)
 
-# Application Initialization
 app = FastAPI(title="EcoRecycle API")
-
-# Register Performance & Route Timing Middleware
 app.add_middleware(PerformanceLoggingMiddleware)
 
-# Strict anti-caching headers for protected routes
 NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0, private",
     "Pragma": "no-cache",
     "Expires": "0"
 }
 
-# CORS Middleware Configuration
 origins = [
     "https://upstream-trash-sol.onrender.com",
     "http://localhost:8000",
@@ -82,10 +82,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Debug Router
 app.include_router(debug_router)
 
-# Mount Static File Directories
 for folder in ["static", "image_assets", "webpages"]:
     os.makedirs(folder, exist_ok=True)
 
@@ -124,11 +122,11 @@ class StaffLoginSchema(BaseModel):
     password: str
 
 class StaffReviewSchema(BaseModel):
-    action: str  # "approve" or "decline"
+    action: str  
     rejection_reason: Optional[str] = None
 
 class EntryReviewSchema(BaseModel):
-    action: str  # "approve" or "decline"
+    action: str  
     rejection_reason: Optional[str] = None
     staff_id: Optional[int] = None
 
@@ -217,10 +215,11 @@ async def verify_otp_route(data: OTPVerify, request: Request):
     response = JSONResponse(
         content={"status": "success", "message": "OTP verified successfully."}
     )
+    # Enforce HttpOnly cookie to prevent client tampering
     response.set_cookie(
         key="session_authenticated",
         value="true",
-        httponly=False,
+        httponly=True,
         samesite="lax",
         path="/"
     )
@@ -248,7 +247,7 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
     response.set_cookie(
         key="session_authenticated",
         value="true",
-        httponly=False,
+        httponly=True,
         samesite="lax",
         path="/"
     )
@@ -306,7 +305,7 @@ async def register_staff_account(data: StaffRegisterSchema, request: Request, db
         log_auth_event("STAFF_REGISTER", data.email, "FAILED", client_ip, "Duplicate email")
         raise HTTPException(status_code=400, detail="Staff account with this email already exists.")
     
-    hashed_password = sha256(data.password.encode()).hexdigest()
+    hashed_password = hash_password(data.password)
     new_staff = StaffProfile(
         email=data.email,
         full_name=data.full_name,
@@ -323,14 +322,9 @@ async def register_staff_account(data: StaffRegisterSchema, request: Request, db
 @app.post("/api/staff/login")
 async def login_staff_account(data: StaffLoginSchema, request: Request, db: Session = Depends(get_db)):
     client_ip = extract_client_ip(request)
-    hashed_password = sha256(data.password.encode()).hexdigest()
+    staff = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
     
-    staff = db.query(StaffProfile).filter(
-        StaffProfile.email == data.email, 
-        StaffProfile.password_hash == hashed_password
-    ).first()
-    
-    if not staff:
+    if not staff or not verify_password(data.password, staff.password_hash):
         log_auth_event("STAFF_LOGIN", data.email, "FAILED", client_ip, "Invalid credentials")
         raise HTTPException(status_code=401, detail="Invalid staff credentials.")
         
@@ -342,8 +336,8 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         "email": staff.email, 
         "assigned_pincode": staff.assigned_pincode
     })
-    response.set_cookie(key="staff_authenticated", value="true", httponly=False, samesite="lax", path="/")
-    response.set_cookie(key="session_authenticated", value="true", httponly=False, samesite="lax", path="/")
+    response.set_cookie(key="staff_authenticated", value="true", httponly=True, samesite="lax", path="/")
+    response.set_cookie(key="session_authenticated", value="true", httponly=True, samesite="lax", path="/")
     return response
 
 @app.post("/api/staff/users/{user_id}/review")
