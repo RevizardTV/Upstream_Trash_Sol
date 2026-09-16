@@ -10,6 +10,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Requ
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, EmailStr
 import redis.asyncio as redis
 
@@ -62,6 +63,53 @@ redis_client = redis.from_url(redis_url, decode_responses=True)
 
 app = FastAPI(title="EcoRecycle API")
 app.add_middleware(PerformanceLoggingMiddleware)
+
+# --- Middleware for Deep Payload and Request Inspection ---
+@app.middleware("http")
+async def inspect_incoming_requests(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/auth/") or path.startswith("/api/staff/"):
+        logger.info(f"📥 [REQUEST START] {request.method} {path} | Client IP: {extract_client_ip(request)}")
+        logger.info(f"📋 [HEADERS] Content-Type: {request.headers.get('content-type')} | User-Agent: {request.headers.get('user-agent')}")
+        
+        # Read body for inspection without consuming stream permanently
+        if request.method in ["POST", "PUT", "PATCH"]:
+            body_bytes = await request.body()
+            logger.info(f"📦 [RAW BODY]: {body_bytes.decode('utf-8', errors='ignore')}")
+            
+            async def receive():
+                return {"type": "http.request", "body": body_bytes}
+            
+            request = Request(request.scope, receive=receive)
+
+    response = await call_next(request)
+    
+    if path.startswith("/api/auth/") or path.startswith("/api/staff/"):
+        logger.info(f"📤 [REQUEST END] {request.method} {path} -> Status Code: {response.status_code}")
+        
+    return response
+
+# --- Validation Exception Handler (Catches 422/400 Data Mismatches) ---
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    body = await request.body()
+    logger.error(f"❌ [422 VALIDATION ERROR] Path: {request.url.path}")
+    logger.error(f"❌ [FAILED PAYLOAD]: {body.decode('utf-8', errors='ignore')}")
+    logger.error(f"❌ [VALIDATION DETAILS]: {json.dumps(exc.errors())}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"status": "error", "detail": exc.errors(), "body": exc.body}
+    )
+
+# --- HTTP Exception Handler (Catches Explicit 400 Bad Requests) ---
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    if exc.status_code >= 400:
+        logger.warning(f"⚠️ [HTTP {exc.status_code}] Path: {request.url.path} | Detail: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"status": "error", "detail": exc.detail}
+    )
 
 # --- Global Exception Handler for Uncaught 500 Errors ---
 @app.exception_handler(Exception)
@@ -238,29 +286,43 @@ async def staff_logout():
 @app.post("/api/auth/request-otp")
 async def request_otp(data: OTPRequest, request: Request):
     client_ip = extract_client_ip(request)
-    return await process_otp_request(data.email_address, client_ip)
+    logger.info(f"📧 [OTP REQUEST INITIATED] Target Email: {data.email_address} | IP: {client_ip}")
+    try:
+        result = await process_otp_request(data.email_address, client_ip)
+        logger.info(f"✅ [OTP REQUEST SUCCESS] Email dispatched to {data.email_address}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ [OTP REQUEST FAILED] Email: {data.email_address} | Error: {str(e)}", exc_info=True)
+        raise e
 
 @app.post("/api/auth/verify-otp")
 async def verify_otp_route(data: OTPVerify, request: Request):
     client_ip = extract_client_ip(request)
-    await process_otp_verification(data.email_address, data.otp_code, client_ip)
-    
-    response = JSONResponse(
-        content={"status": "success", "message": "OTP verified successfully."}
-    )
-    response.set_cookie(
-        key="user_authenticated",
-        value="true",
-        httponly=False,
-        samesite="lax",
-        path="/"
-    )
-    response.delete_cookie(key="staff_authenticated", path="/")
-    return response
+    logger.info(f"🔑 [OTP VERIFY INITIATED] Email: {data.email_address} | Code: {data.otp_code} | IP: {client_ip}")
+    try:
+        await process_otp_verification(data.email_address, data.otp_code, client_ip)
+        logger.info(f"✅ [OTP VERIFY SUCCESS] Granted session to {data.email_address}")
+        
+        response = JSONResponse(
+            content={"status": "success", "message": "OTP verified successfully."}
+        )
+        response.set_cookie(
+            key="user_authenticated",
+            value="true",
+            httponly=False,
+            samesite="lax",
+            path="/"
+        )
+        response.delete_cookie(key="staff_authenticated", path="/")
+        return response
+    except Exception as e:
+        logger.error(f"❌ [OTP VERIFY FAILED] Email: {data.email_address} | Error: {str(e)}", exc_info=True)
+        raise e
 
 @app.post("/api/auth/complete-profile")
 async def save_user_profile(data: ProfileCreateSchema, response: Response, db: Session = Depends(get_db)):
     try:
+        logger.info(f"📝 [PROFILE SAVE INITIATED] Email: {data.email}")
         user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
         
         user_data = data.model_dump()
@@ -289,7 +351,7 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
         return {"status": "success", "message": "Profile saved successfully!", "user_id": user.id}
     except Exception as e:
         db.rollback()
-        logger.error(f"Error saving user profile: {str(e)}", exc_info=True)
+        logger.error(f"❌ [PROFILE SAVE FAILED] Error saving user profile: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database profile update failed: {str(e)}")
 
 
@@ -302,10 +364,13 @@ async def get_user_profile(
     user_authenticated: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    logger.info(f"🔍 [GET PROFILE] user_id: {user_id} | email: {email} | cookie: {user_authenticated}")
     if user_authenticated != "true":
+        logger.warning("🔒 [GET PROFILE REJECTED] Cookie user_authenticated != true")
         raise HTTPException(status_code=401, detail="Unauthorized session")
 
     if not user_id and not email:
+        logger.warning("⚠️ [GET PROFILE BAD REQUEST] Missing user_id and email parameters")
         raise HTTPException(status_code=400, detail="Must provide user_id or email query parameter")
     
     query = db.query(UserProfile)
@@ -315,6 +380,7 @@ async def get_user_profile(
         user = query.filter(UserProfile.email == email).first()
 
     if not user:
+        logger.warning(f"⚠️ [GET PROFILE NOT FOUND] Query failed for id={user_id}, email={email}")
         raise HTTPException(status_code=404, detail="Profile not found")
 
     return {
@@ -339,12 +405,13 @@ async def get_user_profile(
 @app.post("/api/staff/register")
 async def register_staff_account(data: StaffRegisterSchema, request: Request, db: Session = Depends(get_db)):
     client_ip = extract_client_ip(request)
-    logger.info(f"Attempting staff registration for: {data.email} | PIN: {data.assigned_pincode}")
+    logger.info(f"👮 [STAFF REGISTER] Email: {data.email} | PIN: {data.assigned_pincode} | IP: {client_ip}")
 
     try:
         existing = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
         if existing:
             log_auth_event("STAFF_REGISTER", data.email, "FAILED", client_ip, "Duplicate email")
+            logger.warning(f"⚠️ [STAFF REGISTER DUPLICATE] {data.email} already exists")
             raise HTTPException(status_code=400, detail="Staff account with this email already exists.")
         
         hashed_password = hash_password(data.password)
@@ -359,6 +426,7 @@ async def register_staff_account(data: StaffRegisterSchema, request: Request, db
         db.refresh(new_staff)
         
         log_auth_event("STAFF_REGISTER", data.email, "SUCCESS", client_ip, f"Assigned PIN: {data.assigned_pincode}")
+        logger.info(f"✅ [STAFF REGISTER SUCCESS] Created Staff ID #{new_staff.id}")
         return {"status": "success", "message": "Staff registered successfully!", "staff_id": new_staff.id}
     except HTTPException as he:
         raise he
@@ -372,14 +440,22 @@ async def register_staff_account(data: StaffRegisterSchema, request: Request, db
 
 @app.post("/api/staff/login")
 async def login_staff_account(data: StaffLoginSchema, request: Request, db: Session = Depends(get_db)):
-    print("STAFF LOGIN ACTIVATED")
     client_ip = extract_client_ip(request)
+    logger.info(f"👮 [STAFF LOGIN ATTEMPT] Email: {data.email} | IP: {client_ip}")
+    
     staff = db.query(StaffProfile).filter(StaffProfile.email == data.email).first()
     
-    if not staff or not verify_password(data.password, staff.password_hash):
-        log_auth_event("STAFF_LOGIN", data.email, "FAILED", client_ip, "Invalid credentials")
+    if not staff:
+        logger.warning(f"❌ [STAFF LOGIN FAILED] Email '{data.email}' not found in database")
+        log_auth_event("STAFF_LOGIN", data.email, "FAILED", client_ip, "User not found")
+        raise HTTPException(status_code=401, detail="Invalid staff credentials.")
+
+    if not verify_password(data.password, staff.password_hash):
+        logger.warning(f"❌ [STAFF LOGIN FAILED] Password mismatch for '{data.email}'")
+        log_auth_event("STAFF_LOGIN", data.email, "FAILED", client_ip, "Invalid password")
         raise HTTPException(status_code=401, detail="Invalid staff credentials.")
         
+    logger.info(f"✅ [STAFF LOGIN SUCCESS] Authenticated Staff ID #{staff.id}")
     log_auth_event("STAFF_LOGIN", data.email, "SUCCESS", client_ip, f"Staff ID: {staff.id}")
     
     response = JSONResponse(content={
@@ -389,7 +465,6 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         "assigned_pincode": staff.assigned_pincode
     })
     
-    # Ensure explicit path and proper samesite settings
     response.set_cookie(
         key="staff_authenticated", 
         value="true", 
@@ -407,8 +482,10 @@ async def review_user_profile(
     data: StaffReviewSchema, 
     db: Session = Depends(get_db)
 ):
+    logger.info(f"📋 [STAFF USER REVIEW] Target User ID #{user_id} | Action: {data.action}")
     user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
     if not user:
+        logger.warning(f"⚠️ [STAFF USER REVIEW FAILED] User ID #{user_id} not found")
         raise HTTPException(status_code=404, detail=f"User ID #{user_id} not found.")
 
     user.profile_complete = True if data.action == "approve" else False
@@ -420,12 +497,14 @@ async def review_user_profile(
 
 @app.post("/api/recycling/entry")
 async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(get_db)):
+    logger.info(f"♻️ [RECYCLING ENTRY] User ID: {data.user_id} | Category: {data.waste_category} | Weight: {data.weight_kg}kg")
     try:
         user = None
         if data.user_id:
             user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
         
         if not user:
+            logger.warning(f"⚠️ [RECYCLING ENTRY FAILED] User ID #{data.user_id} not found")
             raise HTTPException(status_code=404, detail=f"User ID {data.user_id} not found in user_profiles.")
             
         new_entry = RecyclingEntry(
@@ -443,6 +522,7 @@ async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(
         db.refresh(new_entry)
         
         log_recycling_action("SUBMIT", user.id, data.weight_kg, "PENDING", f"Category: {data.waste_category}")
+        logger.info(f"✅ [RECYCLING ENTRY SUCCESS] Created Entry #{new_entry.entry_id}")
         return {
             "status": "success", 
             "message": "Recycling transaction recorded!", 
@@ -462,11 +542,13 @@ async def get_pending_payments(
     db: Session = Depends(get_db)
 ):
     if not user_id and not email:
+        logger.warning("⚠️ [PENDING PAYMENTS BAD REQUEST] Missing user_id and email query parameters")
         raise HTTPException(status_code=400, detail="Must provide user_id or email")
     
     if not user_id and email:
         user = db.query(UserProfile).filter(UserProfile.email == email).first()
         if not user:
+            logger.warning(f"⚠️ [PENDING PAYMENTS NOT FOUND] Email '{email}' not found")
             raise HTTPException(status_code=404, detail="User profile not found")
         user_id = user.id
 
@@ -502,11 +584,13 @@ async def get_reviewed_requests(
     db: Session = Depends(get_db)
 ):
     if not user_id and not email:
+        logger.warning("⚠️ [REVIEWED REQUESTS BAD REQUEST] Missing user_id and email parameters")
         raise HTTPException(status_code=400, detail="Must provide user_id or email")
     
     if not user_id and email:
         user = db.query(UserProfile).filter(UserProfile.email == email).first()
         if not user:
+            logger.warning(f"⚠️ [REVIEWED REQUESTS NOT FOUND] Email '{email}' not found")
             raise HTTPException(status_code=404, detail="User profile not found")
         user_id = user.id
 
@@ -545,6 +629,7 @@ async def get_user_recycling_summary(
     if not user_id and email:
         user = db.query(UserProfile).filter(UserProfile.email == email).first()
         if not user:
+            logger.warning(f"⚠️ [RECYCLING SUMMARY NOT FOUND] Email '{email}' not found")
             raise HTTPException(status_code=404, detail="User not found")
         user_id = user.id
 
@@ -583,7 +668,9 @@ async def get_district_users(
     exact_pincode: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
+    logger.info(f"🔍 [DISTRICT USERS] Pincode: {staff_pincode} | Search: {search} | Exact PIN: {exact_pincode}")
     if len(staff_pincode) < 3:
+        logger.warning(f"⚠️ [DISTRICT USERS BAD REQUEST] Pincode '{staff_pincode}' too short")
         raise HTTPException(status_code=400, detail="Staff pincode must be at least 3 digits.")
 
     district_prefix = staff_pincode[:3]
@@ -630,6 +717,7 @@ async def get_district_users(
 @app.get("/api/admin/show-data")
 async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
     table_lower = table.lower()
+    logger.info(f"📊 [SHOW DATA] Requested table: {table_lower}")
     
     if table_lower in ["profile", "profiles", "user_profiles"]:
         records = db.query(UserProfile).all()
@@ -667,6 +755,7 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
         return {"status": "success", "table": "recycling_entries", "count": len(data), "data": data}
 
     else:
+        logger.warning(f"⚠️ [SHOW DATA BAD REQUEST] Unknown table name '{table}'")
         raise HTTPException(
             status_code=400, 
             detail=f"Unknown table parameter '{table}'."
@@ -675,6 +764,7 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
 # --- Household Pending Trash Entries for Staff Review ---
 @app.get("/api/admin/user-pending-entries/{user_id}")
 async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
+    logger.info(f"📋 [USER PENDING ENTRIES] Fetching pending entries for User ID #{user_id}")
     entries = db.query(RecyclingEntry).filter(
         RecyclingEntry.user_id == user_id,
         RecyclingEntry.status == "pending"
@@ -698,11 +788,13 @@ async def get_user_pending_entries(user_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/recycling/receipt/{entry_id}")
 async def download_receipt(entry_id: int, db: Session = Depends(get_db)):
+    logger.info(f"📄 [DOWNLOAD RECEIPT] Generating receipt for Entry #{entry_id}")
     result = db.query(RecyclingEntry, UserProfile).\
         join(UserProfile, RecyclingEntry.user_id == UserProfile.id).\
         filter(RecyclingEntry.entry_id == entry_id).first()
 
     if not result:
+        logger.warning(f"⚠️ [DOWNLOAD RECEIPT NOT FOUND] Entry #{entry_id} not found")
         raise HTTPException(status_code=404, detail=f"Recycling entry #{entry_id} not found.")
 
     entry, user = result
@@ -722,7 +814,7 @@ async def download_receipt(entry_id: int, db: Session = Depends(get_db)):
     try:
         pdf_bytes = generate_receipt_pdf(receipt_payload)
     except Exception as e:
-        logger.error(f"Error generating PDF for entry #{entry_id}: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error generating PDF for entry #{entry_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to render transaction PDF receipt.")
 
     return StreamingResponse(
@@ -740,8 +832,10 @@ async def review_recycling_entry(
     data: EntryReviewSchema, 
     db: Session = Depends(get_db)
 ):
+    logger.info(f"📋 [REVIEW RECYCLING ENTRY] Entry #{entry_id} | Action: {data.action} | Staff ID: {data.staff_id}")
     entry = db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).first()
     if not entry:
+        logger.warning(f"⚠️ [REVIEW ENTRY NOT FOUND] Entry #{entry_id} not found")
         raise HTTPException(status_code=404, detail="Recycling entry not found.")
 
     new_status = "approved" if data.action == "approve" else "declined"
