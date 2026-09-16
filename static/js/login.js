@@ -90,6 +90,7 @@ async function handleVerifyOTP(event) {
             if (otpIntervalId) clearInterval(otpIntervalId);
     
             sessionStorage.setItem("verified_email", state.email);
+            sessionStorage.setItem("user_email", emailInput.value);
             sessionStorage.removeItem('pending_email');
             sessionStorage.removeItem('login_step');
     
