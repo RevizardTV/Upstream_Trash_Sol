@@ -15,9 +15,9 @@ def verify_admin_access(x_admin_secret: str = Header(None)):
             detail="Unauthorized: Invalid administrative authorization token."
         )
 
-@router.get("/show-profiles")
+@router.get("/show-profiles", dependencies=[Depends(verify_admin_access)])
 async def show_profiles(db: Session = Depends(get_db)):
-    """Fetch all registered user profiles."""
+    """Fetch all registered user profiles (Protected)."""
     profiles = db.query(UserProfile).all()
     data = [
         {
@@ -36,9 +36,9 @@ async def show_profiles(db: Session = Depends(get_db)):
     ]
     return {"status": "success", "count": len(data), "profiles": data}
 
-@router.get("/show-staff")
+@router.get("/show-staff", dependencies=[Depends(verify_admin_access)])
 async def show_staff_profiles(db: Session = Depends(get_db)):
-    """Extract and display all registered staff profiles."""
+    """Extract and display all registered staff profiles (Protected)."""
     staff_members = db.query(StaffProfile).all()
     data = [
         {
@@ -46,15 +46,16 @@ async def show_staff_profiles(db: Session = Depends(get_db)):
             "email": s.email,
             "full_name": s.full_name,
             "assigned_pincode": s.assigned_pincode,
+            # Note: password_hash is intentionally omitted from returning payloads for safety
             "created_at": s.created_at.isoformat() if s.created_at else None
         }
         for s in staff_members
     ]
     return {"status": "success", "count": len(data), "staff": data}
 
-@router.get("/show-data")
+@router.get("/show-data", dependencies=[Depends(verify_admin_access)])
 async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
-    """Inspect tables dynamically (Profile, Staff, Trash/Recycling)."""
+    """Inspect tables dynamically (Protected)."""
     table_lower = table.lower()
     
     if table_lower in ["profile", "profiles", "user_profiles"]:
@@ -88,7 +89,7 @@ async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
 
 @router.post("/wipe-database", dependencies=[Depends(verify_admin_access)])
 async def wipe_database(db: Session = Depends(get_db)):
-    """Purge entries across profiles, staff, and recycling queues (Requires Authorization Header)."""
+    """Purge entries across profiles, staff, and recycling queues (Protected)."""
     try:
         db.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
         db.execute(text("TRUNCATE TABLE recycling_entries;"))
@@ -103,47 +104,3 @@ async def wipe_database(db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to wipe database: {str(e)}"
         )
-        
-@router.get("/district-users")
-async def get_district_users(
-    staff_pincode: str = Query(...),
-    search: str = Query(None),
-    exact_pincode: str = Query(None),
-    db: Session = Depends(get_db)
-):
-    if len(staff_pincode) < 3:
-        raise HTTPException(status_code=400, detail="Staff pincode must be at least 3 digits.")
-
-    district_prefix = staff_pincode[:3]
-    query = db.query(UserProfile).filter(UserProfile.postal_code.like(f"{district_prefix}%"))
-
-    if search:
-        search_filter = f"%{search}%"
-        query = query.filter(
-            (UserProfile.full_name.ilike(search_filter)) | 
-            (UserProfile.email.ilike(search_filter))
-        )
-
-    if exact_pincode:
-        query = query.filter(UserProfile.postal_code == exact_pincode)
-
-    profiles = query.all()
-
-    return {
-        "status": "success",
-        "district_prefix": district_prefix,
-        "count": len(profiles),
-        "profiles": [
-            {
-                "id": p.id,
-                "full_name": p.full_name,
-                "email": p.email,
-                "phone_number": p.phone_number,
-                "city": p.city,
-                "postal_code": p.postal_code,
-                "premise_type": p.premise_type,
-                "household_size": p.household_size,
-                "upi_id": p.upi_id
-            } for p in profiles
-        ]
-    }

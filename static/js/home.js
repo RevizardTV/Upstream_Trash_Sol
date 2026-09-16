@@ -6,17 +6,28 @@ if (goToLoginBtn) {
     });
 }
 
+// Utility function to fetch secret key if missing
+function getAdminKey(providedSecret) {
+    return providedSecret || prompt("Enter Administrative Secret Key (EM_RESET_KEY):");
+}
+
 // Global Console Utility Commands
-window.wipeDatabase = async function() {
+window.wipeDatabase = async function(providedSecret) {
     if (!confirm("Are you sure you want to wipe all profiles, staff records, and queued trash data? This action cannot be undone.")) {
         console.log("Database wipe cancelled.");
         return;
     }
 
+    const secretKey = getAdminKey(providedSecret);
+    if (!secretKey) return console.warn("⚠️ Operation cancelled: Missing administrative authorization token.");
+
     try {
         const response = await fetch("/api/admin/wipe-database", {
             method: "POST",
-            headers: { "Content-Type": "application/json" }
+            headers: { 
+                "Content-Type": "application/json",
+                "X-Admin-Secret": secretKey
+            }
         });
         const result = await response.json();
 
@@ -30,9 +41,14 @@ window.wipeDatabase = async function() {
     }
 };
 
-window.showProfiles = async function() {
+window.showProfiles = async function(providedSecret) {
+    const secretKey = getAdminKey(providedSecret);
+    if (!secretKey) return console.warn("⚠️ Operation cancelled: Missing administrative authorization token.");
+
     try {
-        const response = await fetch("/api/admin/show-profiles");
+        const response = await fetch("/api/admin/show-profiles", {
+            headers: { "X-Admin-Secret": secretKey }
+        });
         const result = await response.json();
 
         if (response.ok) {
@@ -47,9 +63,14 @@ window.showProfiles = async function() {
     }
 };
 
-window.showStaff = async function() {
+window.showStaff = async function(providedSecret) {
+    const secretKey = getAdminKey(providedSecret);
+    if (!secretKey) return console.warn("⚠️ Operation cancelled: Missing administrative authorization token.");
+
     try {
-        const response = await fetch("/api/admin/show-staff");
+        const response = await fetch("/api/admin/show-staff", {
+            headers: { "X-Admin-Secret": secretKey }
+        });
         const result = await response.json();
 
         if (response.ok) {
@@ -64,9 +85,14 @@ window.showStaff = async function() {
     }
 };
 
-window.showData = async function(table = "Profile") {
+window.showData = async function(table = "Profile", providedSecret) {
+    const secretKey = getAdminKey(providedSecret);
+    if (!secretKey) return console.warn("⚠️ Operation cancelled: Missing administrative authorization token.");
+
     try {
-        const response = await fetch(`/api/admin/show-data?table=${encodeURIComponent(table)}`);
+        const response = await fetch(`/api/admin/show-data?table=${encodeURIComponent(table)}`, {
+            headers: { "X-Admin-Secret": secretKey }
+        });
         const result = await response.json();
 
         if (response.ok) {
@@ -81,4 +107,4 @@ window.showData = async function(table = "Profile") {
     }
 };
 
-console.log("🛠️ Admin Console Commands Ready: `wipeDatabase()`, `showProfiles()`, `showStaff()`, `showData('Profile')`, `showData('Staff')`, or `showData('Trash')`");
+console.log("🛠️ Protected Admin Console Commands Ready: `wipeDatabase('SECRET')`, `showProfiles('SECRET')`, `showStaff('SECRET')`, or `showData('Profile', 'SECRET')`");
