@@ -864,40 +864,31 @@ async def download_receipt(entry_id: int, db: Session = Depends(get_db)):
 
 # --- REVIEW (Approve / Decline) Waste Entry ---
 
+# main_3.py
 @app.post("/api/staff/entries/{entry_id}/review")
 async def review_recycling_entry(
     entry_id: int, 
     data: EntryReviewSchema, 
     db: Session = Depends(get_db)
 ):
-    logger.info(f"📋 [REVIEW RECYCLING ENTRY] Entry #{entry_id} | Action: {data.action} | Staff ID: {data.staff_id}")
     entry = db.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).first()
     if not entry:
-        logger.warning(f"⚠️ [REVIEW ENTRY NOT FOUND] Entry #{entry_id} not found")
         raise HTTPException(status_code=404, detail="Recycling entry not found.")
 
-    # Validate staff ID existence if provided
     valid_staff_id = None
     if data.staff_id is not None:
-        staff_exists = db.query(StaffProfile).filter(StaffProfile.id == data.staff_id).first()
-        if not staff_exists:
-            logger.warning(f"⚠️ [REVIEW ENTRY BAD STAFF ID] Staff ID #{data.staff_id} does not exist in staff_profiles.")
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Staff ID #{data.staff_id} does not exist in staff database."
-            )
-        valid_staff_id = data.staff_id
+        staff = db.query(StaffProfile).filter(StaffProfile.id == data.staff_id).first()
+        if staff:
+            valid_staff_id = staff.id
+        else:
+            logger.warning(f"⚠️ Staff ID #{data.staff_id} not found. Proceeding without linking staff ID.")
 
     new_status = "approved" if data.action == "approve" else "declined"
-    
     entry.status = new_status
-    if hasattr(entry, "reviewed_by_staff_id"):
-        setattr(entry, "reviewed_by_staff_id", valid_staff_id)
-        
+    entry.reviewed_by_staff_id = valid_staff_id
+    
     if data.action == "decline":
         entry.rejection_reason = data.rejection_reason or "Declined by district officer"
         
     db.commit()
-    db.refresh(entry)
-    
-    return {"status": "success", "message": f"Entry #{entry_id} successfully updated to {new_status}."}
+    return {"status": "success", "message": f"Entry #{entry_id} updated to {new_status}."}
