@@ -29,12 +29,20 @@ async def process_otp_request(email_address: str, client_ip: str, email_type: st
     if error or not otp:
         raise HTTPException(status_code=429, detail=error)
 
-    await send_email(
-        to_email=email_address,
-        subject="EcoRecycle Staff Portal Code" if email_type == "staff" else "EcoRecycle Verification Code",
-        body=otp,
-        email_type=email_type
-    )
+    try:
+        await send_email(
+            to_email=email_address,
+            subject="EcoRecycle Staff Portal Code" if email_type == "staff" else "EcoRecycle Verification Code",
+            body=otp,
+            email_type=email_type
+        )
+    except ResendError as e:
+        logger.error(f"Failed to deliver OTP email via Resend to {email_address}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to send verification email. Please try again shortly."
+        )
+
     return {"status": "success", "message": "OTP code dispatched successfully"}
 
 

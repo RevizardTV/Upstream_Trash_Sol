@@ -214,6 +214,7 @@ class StaffRegisterSchema(BaseModel):
 class StaffLoginSchema(BaseModel):
     email: EmailStr
     password: str
+    type:str
 
 class StaffReviewSchema(BaseModel):
     action: str  
@@ -313,7 +314,7 @@ async def request_otp(data: OTPRequest, request: Request):
     client_ip = extract_client_ip(request)
     logger.info(f"📧 [OTP REQUEST INITIATED] Target Email: {data.email_address} | IP: {client_ip}")
     try:
-        result = await process_otp_request(data.email_address, client_ip)
+        result = await process_otp_request(data.email_address, client_ip, email_type=data.type or "user")
         logger.info(f"✅ [OTP REQUEST SUCCESS] Email dispatched to {data.email_address}")
         return result
     except Exception as e:
