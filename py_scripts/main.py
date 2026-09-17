@@ -214,7 +214,6 @@ class StaffRegisterSchema(BaseModel):
 class StaffLoginSchema(BaseModel):
     email: EmailStr
     password: str
-    type:str
 
 class StaffReviewSchema(BaseModel):
     action: str  
