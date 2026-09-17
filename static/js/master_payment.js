@@ -1,6 +1,5 @@
 let currentUser = null;
 
-// SPA Navigation Switcher
 function switchTab(viewId) {
     const panels = document.querySelectorAll('.view-panel');
     panels.forEach(panel => panel.classList.add('hidden'));
@@ -26,7 +25,6 @@ function switchTab(viewId) {
     if (viewId === 'view-options') fetchUserSummary();
 }
 
-// Category Tips Dictionary
 const categoryTips = {
     plastic: "Ensure bottles are rinsed and flattened. Caps can be included.",
     metal: "Separate aluminum cans from heavy steel scrap for accurate weighing.",
@@ -47,7 +45,6 @@ function showTip(category) {
     }
 }
 
-// Live Payout / Fee Calculation Listener
 function updateLiveCalculation() {
     const selectedMaterial = document.querySelector('input[name="material"]:checked');
     const weightInput = document.getElementById('weightInput');
@@ -70,7 +67,6 @@ function updateLiveCalculation() {
     }
 }
 
-// Fetch Profile Information
 async function loadUserProfile() {
     const storedEmail = localStorage.getItem('user_email') || sessionStorage.getItem('user_email');
     if (!storedEmail) {
@@ -102,7 +98,6 @@ async function loadUserProfile() {
     }
 }
 
-// Fetch Account Dashboard Summary
 async function fetchUserSummary() {
     if (!currentUser) return;
 
@@ -124,7 +119,6 @@ async function fetchUserSummary() {
     }
 }
 
-// Submit Waste Entry Form
 async function handleFormSubmit(e) {
     e.preventDefault();
     if (!currentUser) {
@@ -185,7 +179,6 @@ async function handleFormSubmit(e) {
     }
 }
 
-// Fetch Pending Entries Queue
 async function fetchPendingPayments() {
     if (!currentUser) return;
     
@@ -227,7 +220,6 @@ async function fetchPendingPayments() {
     }
 }
 
-// Fetch Reviewed (Approved/Declined) Entries
 async function fetchReviewedRequests() {
     if (!currentUser) return;
 
@@ -283,9 +275,7 @@ async function fetchReviewedRequests() {
     }
 }
 
-// Initialization Handlers
 document.addEventListener('DOMContentLoaded', () => {
-    // Nav Navigation Listener
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const view = btn.getAttribute('data-view');
@@ -293,7 +283,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Inputs Calculation Binding
     const weightInput = document.getElementById('weightInput');
     if (weightInput) {
         weightInput.addEventListener('input', updateLiveCalculation);
@@ -303,21 +292,18 @@ document.addEventListener('DOMContentLoaded', () => {
         radio.addEventListener('change', updateLiveCalculation);
     });
 
-    // Form Listener
     const registerForm = document.getElementById('paymentRegisterForm');
     if (registerForm) {
         registerForm.addEventListener('submit', handleFormSubmit);
     }
 
-    // Default Load Procedures
     loadUserProfile();
     switchTab('view-options');
 });
 
+// Fixed logout routine to clear local and session storages
 function logout() {
-    if (typeof authGuardLogout === 'function') {
-        authGuardLogout();
-    } else {
-        window.location.href = '/logout';
-    }
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = '/login';
 }

@@ -2,17 +2,24 @@
  * Global Redis Inspection & Management Console Toolkit
  */
 
+function getAdminSecretKey() {
+    if (typeof ADMIN_SECRET_KEY !== 'undefined' && ADMIN_SECRET_KEY) {
+        return ADMIN_SECRET_KEY;
+    }
+    return prompt("Enter Administrative Secret Key:");
+}
 
-
-// 1. Live Redis Inspector
 window.redis = async function() {
     console.log("%c🔄 Fetching live Redis keys, types, values, and TTLs safely...", "color: #38bdf8; font-weight: bold;");
     
+    const secretKey = getAdminSecretKey();
+    if (!secretKey) return "Operation cancelled: Missing admin key.";
+
     try {
         const response = await fetch('/api/auth/redis-inspect', {
             method: 'GET',
             headers: {
-                'x-secret-key': ADMIN_SECRET_KEY, 
+                'x-secret-key': secretKey, 
                 'Accept': 'application/json'
             }
         });
@@ -22,9 +29,7 @@ window.redis = async function() {
             try {
                 const errResult = await response.json();
                 errorMsg = errResult.detail || errorMsg;
-            } catch (_) {
-                // Endpoint returned non-JSON response (e.g., HTML 404 page)
-            }
+            } catch (_) {}
             throw new Error(errorMsg);
         }
 
@@ -49,7 +54,6 @@ window.redis = async function() {
                 expiration = `${rec.ttl_seconds}s remaining (${mins}m ${secs}s)`;
             }
 
-            // Pretty print formatted JSON values if applicable
             let parsedValue = rec.value;
             try {
                 parsedValue = JSON.parse(rec.value);
@@ -66,17 +70,16 @@ window.redis = async function() {
 
     } catch (err) {
         console.warn(`%c⚠️ Inspector Error: ${err.message}`, "color: #fbbf24; font-weight: bold;");
-        if (err.message.includes("404")) {
-            console.log("%c💡 Note: Ensure the endpoint '@app.get(\"/api/auth/redis-inspect\")' is added to main.py", "color: #cbd5e1;");
-        }
         return "Inspection halted.";
     }
 };
 
-// 2. Global Database Reset Utility
 window.resetDatabase = async function() {
     console.log("%c⚡ Sending emergency reset command to Redis...", "color: #f59e0b; font-weight: bold;");
     
+    const secretKey = getAdminSecretKey();
+    if (!secretKey) return "Operation cancelled: Missing admin key.";
+
     const endpoints = ["/api/auth/emergency-reset", "/emergency-reset"];
     let success = false;
 
@@ -85,7 +88,7 @@ window.resetDatabase = async function() {
             const response = await fetch(path, {
                 method: "POST",
                 headers: {
-                    "X-Secret-Key": ADMIN_SECRET_KEY,
+                    "X-Secret-Key": secretKey,
                     "Content-Type": "application/json"
                 }
             });
@@ -107,7 +110,6 @@ window.resetDatabase = async function() {
     }
 };
 
-// 3. Clear Local Session Helper
 window.clearSession = function() {
     sessionStorage.clear();
     console.log("%c🧹 Session storage cleared successfully.", "color: #34d399;");

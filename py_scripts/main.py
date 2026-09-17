@@ -35,7 +35,7 @@ from py_scripts.otp_service import (
 )
 
 # Logging Utilities
-from py_scripts.logging import (
+from py_scripts.custom_logging import (
     PerformanceLoggingMiddleware, 
     log_auth_event, 
     log_recycling_action, 
@@ -500,7 +500,8 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         raise HTTPException(status_code=401, detail="Invalid staff credentials.")
 
     # 1. Trigger OTP dispatch to staff email
-    await process_otp_request(data.email, client_ip)
+    # main_3.py inside login_staff_account
+    await process_otp_request(data.email, client_ip, email_type="staff")
     logger.info(f"📧 [STAFF OTP DISPATCHED] Sent OTP code to {data.email}")
 
     # 2. Return pending state to frontend without issuing authentication cookies yet

@@ -4,7 +4,7 @@ from resend.exceptions import ResendError
 from typing import Optional
 from py_scripts import login
 from py_scripts.emailSend import send_email
-from py_scripts.logging import log_auth_event, logger
+from py_scripts.custom_logging import log_auth_event, logger
 
 # Schemas
 class OTPRequest(BaseModel):
@@ -24,38 +24,18 @@ def extract_client_ip(request: Request) -> str:
     return request.client.host if request.client else "127.0.0.1"
 
 
-async def process_otp_request(email_address: str, client_ip: str):
-    """Generates an OTP code and dispatches it via email."""
+async def process_otp_request(email_address: str, client_ip: str, email_type: str = "user"):
     otp, error = await login.generate_otp(email_address, client_ip)
-    
     if error or not otp:
-        log_auth_event("OTP_REQUEST", email_address, "FAILED", client_ip, error or "Rate limit exceeded")
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, 
-            detail=error or "Too many OTP requests. Please wait before retrying."
-        )
-    
-    try:
-        await send_email(
-            to_email=email_address,
-            subject="EcoRecycle - Your Login OTP",
-            body=otp
-        )
-        log_auth_event("OTP_REQUEST", email_address, "SUCCESS", client_ip, "OTP sent via email")
-        return {"status": "success", "message": "OTP code dispatched successfully"}
-        
-    except ResendError as re_err:
-        log_auth_event("OTP_REQUEST", email_address, "ERROR", client_ip, f"Resend API Error: {str(re_err)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Resend Mail Error: {str(re_err)}"
-        )
-    except Exception as e:
-        log_auth_event("OTP_REQUEST", email_address, "ERROR", client_ip, f"Mail delivery error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail="OTP saved to database, but email delivery service failed."
-        )
+        raise HTTPException(status_code=429, detail=error)
+
+    await send_email(
+        to_email=email_address,
+        subject="EcoRecycle Staff Portal Code" if email_type == "staff" else "EcoRecycle Verification Code",
+        body=otp,
+        email_type=email_type
+    )
+    return {"status": "success", "message": "OTP code dispatched successfully"}
 
 
 async def process_otp_verification(email_address: str, otp_code: str, client_ip: str):

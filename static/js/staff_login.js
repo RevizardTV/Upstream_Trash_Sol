@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let countdownInterval = null;
     let attemptsLeft = 3;
-    let timerSeconds = 300; // 5-minute OTP lifecycle
+    let timerSeconds = 300;
 
     const showError = (msg) => {
         if (!errorMessage) return;
@@ -35,7 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (timerSeconds <= 0) {
                 clearInterval(countdownInterval);
                 if (otpTimer) otpTimer.textContent = 'OTP code expired. Please request a new code.';
-                document.getElementById('verifyOtpBtn').disabled = true;
+                const verifyBtn = document.getElementById('verifyOtpBtn');
+                if (verifyBtn) verifyBtn.disabled = true;
             }
             timerSeconds--;
         };
@@ -56,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!staffLoginForm) return;
 
-    // Step 1: Verify Password & Reveal Inline OTP Form
     staffLoginForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         showError('');
@@ -88,21 +88,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (response.ok && data.status === 'otp_required') {
+                // Synchronized session and local storage keys for staff dashboard consumption
                 sessionStorage.setItem('staff_id', data.staff_id);
                 sessionStorage.setItem('staff_email', data.email);
                 sessionStorage.setItem('assigned_pincode', data.assigned_pincode);
+                localStorage.setItem('staff_email', data.email);
+                localStorage.setItem('assigned_pincode', data.assigned_pincode);
 
-                // Disable credentials form inputs to lock during verification
                 emailInput.disabled = true;
                 passwordInput.disabled = true;
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = `<i class="fa-solid fa-check text-xs"></i> Password Verified`;
 
-                // Reveal Inline OTP form directly under login
                 staffOtpForm.classList.remove('hidden');
                 document.getElementById('otpCode').focus();
 
-                // Reset attempts & start countdown timer
                 attemptsLeft = 3;
                 updateAttemptsUI();
                 startTimer();
@@ -123,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Step 2: Verify OTP
     if (staffOtpForm) {
         staffOtpForm.addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -186,18 +185,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Return to credentials editing
     if (changeCredentialsBtn) {
         changeCredentialsBtn.addEventListener('click', () => {
             clearInterval(countdownInterval);
             showError('');
 
-            document.getElementById('loginEmail').disabled = false;
-            document.getElementById('loginPassword').disabled = false;
+            const emailInput = document.getElementById('loginEmail');
+            const passwordInput = document.getElementById('loginPassword');
+            if (emailInput) emailInput.disabled = false;
+            if (passwordInput) passwordInput.disabled = false;
             
             const submitBtn = document.getElementById('staffLoginSubmitBtn');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane text-xs"></i> Authenticate & Send Code`;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane text-xs"></i> Authenticate & Send Code`;
+            }
 
             staffOtpForm.classList.add('hidden');
         });

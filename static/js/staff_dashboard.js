@@ -1,7 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
     loadDistrictProfiles();
 
-    // Bind filter form submit handler if form exists
     const filterForm = document.getElementById("filterForm");
     if (filterForm) {
         filterForm.addEventListener("submit", (e) => {
@@ -21,10 +20,15 @@ function getCookie(name) {
 }
 
 async function loadDistrictProfiles(searchQuery = "", exactPin = "") {
-    const staffEmail = localStorage.getItem("staff_email") || getCookie("staff_email") || "nkeerthiganesh@gmail.com";
-    const staffPincode = localStorage.getItem("assigned_pincode") || getCookie("staff_pincode") || "64109";
+    // Removed hardcoded officer credential fallback
+    const staffEmail = localStorage.getItem("staff_email") || sessionStorage.getItem("staff_email") || getCookie("staff_email");
+    const staffPincode = localStorage.getItem("assigned_pincode") || sessionStorage.getItem("assigned_pincode") || getCookie("staff_pincode");
+
+    if (!staffEmail || !staffPincode) {
+        window.location.href = "/staff-login";
+        return;
+    }
     
-    // Update Header Info Elements safely
     const officerEmailEl = document.getElementById("officerEmail");
     const zonePrefixEl = document.getElementById("districtZonePrefix");
     const prefixEl = document.getElementById("districtPrefix");
@@ -33,7 +37,6 @@ async function loadDistrictProfiles(searchQuery = "", exactPin = "") {
     if (zonePrefixEl) zonePrefixEl.textContent = staffPincode;
     if (prefixEl) prefixEl.textContent = staffPincode.substring(0, 3);
 
-    // Get table body by matching ID (supports both householdProfilesTbody and staffProfilesTbody)
     const tbody = document.getElementById("householdProfilesTbody") || document.getElementById("staffProfilesTbody") || document.getElementById("districtUsersList");
     
     if (!tbody) {
@@ -55,7 +58,6 @@ async function loadDistrictProfiles(searchQuery = "", exactPin = "") {
 
         const data = await res.json();
         
-        // Update total profiles count badge if present
         const countBadge = document.getElementById("profilesCountBadge");
         if (countBadge) {
             countBadge.textContent = `${data.count || (data.profiles ? data.profiles.length : 0)} found`;
@@ -76,7 +78,6 @@ async function loadDistrictProfiles(searchQuery = "", exactPin = "") {
         }
 
         for (const user of data.profiles) {
-            // Fetch pending trash entries count for each household
             let pendingEntries = [];
             try {
                 const entriesRes = await fetch(`/api/admin/user-pending-entries/${user.id}`);
@@ -88,7 +89,6 @@ async function loadDistrictProfiles(searchQuery = "", exactPin = "") {
                 console.warn(`Could not load pending entries for user #${user.id}`, e);
             }
 
-            // 1. Main Household Row
             const tr = document.createElement("tr");
             tr.className = "hover:bg-slate-800/40 transition cursor-pointer group border-b border-slate-800/50";
             tr.onclick = () => toggleDropdown(`dropdown-user-${user.id}`);
@@ -116,7 +116,6 @@ async function loadDistrictProfiles(searchQuery = "", exactPin = "") {
             `;
             tbody.appendChild(tr);
 
-            // 2. Nested Dropdown Row for Recycling Entry Approvals
             const dropdownTr = document.createElement("tr");
             dropdownTr.id = `dropdown-user-${user.id}`;
             dropdownTr.className = "accordion-content hidden bg-slate-950/80 border-b border-slate-800/80";
@@ -198,7 +197,7 @@ function toggleDropdown(id) {
 
 async function reviewEntry(event, entryId, action) {
     event.stopPropagation();
-    const staffId = localStorage.getItem("staff_id");
+    const staffId = localStorage.getItem("staff_id") || sessionStorage.getItem("staff_id");
 
     let rejectionReason = null;
     if (action === "decline") {
@@ -226,26 +225,6 @@ async function reviewEntry(event, entryId, action) {
         }
     } catch (err) {
         console.error("Failed to review entry:", err);
-    }
-}
-
-async function reviewUser(userId, action) {
-    try {
-        const res = await fetch(`/api/staff/users/${userId}/review`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: action })
-        });
-
-        if (res.ok) {
-            alert(`User ID #${userId} has been ${action}d successfully.`);
-            loadDistrictProfiles();
-        } else {
-            const err = await res.json();
-            alert("Review failed: " + (err.detail || "Server error"));
-        }
-    } catch (err) {
-        console.error("User review error:", err);
     }
 }
 

@@ -64,7 +64,8 @@ function startCountdownTimer(durationSeconds) {
 async function handleSendOTP(event) {
     event.preventDefault();
     const emailInput = document.getElementById('emailInput');
-    const targetEmail = emailInput.value.trim();
+    const targetEmail = emailInput ? emailInput.value.trim() : '';
+    if (!targetEmail) return;
     
     try {
         await apiPost('/request-otp', { email_address: targetEmail });
@@ -79,7 +80,8 @@ async function handleSendOTP(event) {
 
 async function handleVerifyOTP(event) {
     event.preventDefault();
-    const code = document.getElementById('otpInput').value.trim();
+    const otpInput = document.getElementById('otpInput');
+    const code = otpInput ? otpInput.value.trim() : '';
     const errorDisplay = document.getElementById('errorMessage');
     if (errorDisplay) errorDisplay.textContent = "";
     
@@ -89,8 +91,9 @@ async function handleVerifyOTP(event) {
         if (response.status === "success" || response.success) {
             if (otpIntervalId) clearInterval(otpIntervalId);
     
+            // Fixed ReferenceError by using state.email instead of undefined emailInput.value
             sessionStorage.setItem("verified_email", state.email);
-            sessionStorage.setItem("user_email", emailInput.value);
+            localStorage.setItem("user_email", state.email);
             sessionStorage.removeItem('pending_email');
             sessionStorage.removeItem('login_step');
     
@@ -98,7 +101,7 @@ async function handleVerifyOTP(event) {
         }
     } catch (err) {
         if (errorDisplay) errorDisplay.textContent = err.message;
-        document.getElementById('otpInput').value = '';
+        if (otpInput) otpInput.value = '';
     }
 }
 
