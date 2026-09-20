@@ -5,10 +5,12 @@ import io
 import traceback
 import bcrypt
 from typing import Optional
+from contextlib import asynccontextmanager
 
 # Pydantic Imports
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr,ConfigDict,Field
 
+# FastAPI Imports
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -42,7 +44,10 @@ from py_scripts.custom_logging import (
     logger
 )
 
-# Direct Bcrypt Hashing (Bypasses Passlib 4.x Bugs)
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+
+
 def hash_password(password: str) -> str:
     pwd_bytes = password.encode('utf-8')[:72]
     salt = bcrypt.gensalt()
@@ -53,8 +58,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     hash_bytes = hashed_password.encode('utf-8')
     return bcrypt.checkpw(pwd_bytes, hash_bytes)
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-Base.metadata.create_all(bind=engine)
+
+# App Lifespan Management
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Tables are created when the app actually boots up, NOT on module import
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+# Single FastAPI App Definition
+app = FastAPI(
+    title="EcoRecycle API",
+    lifespan=lifespan
+)
 
 redis_url = os.getenv("REDIS_URL") or getattr(config, "REDIS_URL", None)
 if not redis_url:
@@ -63,8 +80,8 @@ if not redis_url:
 
 redis_client = redis.from_url(redis_url, decode_responses=True)
 
-app = FastAPI(title="EcoRecycle API")
 app.add_middleware(PerformanceLoggingMiddleware)
+
 
 # --- Global Middleware for Route Scope Cookie Enforcement ---
 
@@ -72,7 +89,7 @@ app.add_middleware(PerformanceLoggingMiddleware)
 async def enforce_strict_route_cookie_scopes(request: Request, call_next):
     path = request.url.path
 
-    # Do not clear cookies on static assets or API endpoints (e.g. PDF receipt generation)
+    # Do not clear cookies on static assets or API endpoints
     if path.startswith("/static") or path.startswith("/api"):
         return await call_next(request)
 
@@ -90,6 +107,7 @@ async def enforce_strict_route_cookie_scopes(request: Request, call_next):
         response.delete_cookie(key="user_authenticated", path="/")
 
     return response
+
 
 # --- Middleware for Deep Payload and Request Inspection ---
 
@@ -116,6 +134,7 @@ async def inspect_incoming_requests(request: Request, call_next):
         
     return response
 
+
 # --- Validation Exception Handler ---
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -128,6 +147,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"status": "error", "detail": exc.errors(), "body": exc.body}
     )
 
+
 # --- HTTP Exception Handler ---
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -137,6 +157,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         status_code=exc.status_code,
         content={"status": "error", "detail": exc.detail}
     )
+
 
 # --- Global Exception Handler for Uncaught 500 Errors ---
 @app.exception_handler(Exception)
@@ -197,13 +218,13 @@ class ProfileCreateSchema(BaseModel):
 class RecyclingEntrySchema(BaseModel):
     user_id: Optional[int] = None
     waste_category: str
-    weight_kg: float
+    weight_kg: float = Field(..., gt=0, description="Weight must be greater than 0")
     payout_amount: float
     station_id: Optional[str] = None
     payout_method: Optional[str] = "upi"
 
-    class Config:
-        from_attributes = True
+    # Use Pydantic V2 model_config ONLY (remove 'class Config:')
+    model_config = ConfigDict(from_attributes=True)
 
 class StaffRegisterSchema(BaseModel):
     email: EmailStr
@@ -316,9 +337,11 @@ async def request_otp(data: OTPRequest, request: Request):
         result = await process_otp_request(data.email_address, client_ip, email_type=data.type or "user")
         logger.info(f"✅ [OTP REQUEST SUCCESS] Email dispatched to {data.email_address}")
         return result
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"❌ [OTP REQUEST FAILED] Email: {data.email_address} | Error: {str(e)}", exc_info=True)
-        raise e
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/auth/verify-otp")
 async def verify_otp_route(data: OTPVerify, request: Request, db: Session = Depends(get_db)):
@@ -376,7 +399,7 @@ async def save_user_profile(data: ProfileCreateSchema, response: Response, db: S
         user = db.query(UserProfile).filter(UserProfile.email == data.email).first()
         
         user_data = data.model_dump()
-        user_data["profile_complete"] = False
+        user_data["profile_complete"] = True  # Set to True on completion
 
         if not user:
             user = UserProfile(**user_data)
@@ -500,7 +523,6 @@ async def login_staff_account(data: StaffLoginSchema, request: Request, db: Sess
         raise HTTPException(status_code=401, detail="Invalid staff credentials.")
 
     # 1. Trigger OTP dispatch to staff email
-    # main_3.py inside login_staff_account
     await process_otp_request(data.email, client_ip, email_type="staff")
     logger.info(f"📧 [STAFF OTP DISPATCHED] Sent OTP code to {data.email}")
 
@@ -551,8 +573,14 @@ async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(
             payout_amount=data.payout_amount,
             status="pending"
         )
-        if hasattr(new_entry, "station_id"):
-            setattr(new_entry, "station_id", data.station_id)
+        new_entry = RecyclingEntry(
+            user_id=user.id,
+            waste_category=data.waste_category,
+            weight_kg=data.weight_kg,
+            payout_amount=data.payout_amount,
+            station_id=data.station_id,
+            status="pending"
+        )
 
         db.add(new_entry)
         db.commit()
@@ -713,6 +741,7 @@ async def get_district_users(
     district_prefix = staff_pincode[:3]
     
     query = db.query(UserProfile).filter(
+        UserProfile.postal_code.isnot(None),
         UserProfile.postal_code.like(f"{district_prefix}%"),
         UserProfile.profile_complete == False
     )
@@ -748,55 +777,6 @@ async def get_district_users(
         ]
     }
 
-
-# --- Admin Utility Endpoint ---
-
-@app.get("/api/admin/show-data")
-async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
-    table_lower = table.lower()
-    logger.info(f"📊 [SHOW DATA] Requested table: {table_lower}")
-    
-    if table_lower in ["profile", "profiles", "user_profiles"]:
-        records = db.query(UserProfile).all()
-        data = [
-            {
-                "id": p.id,
-                "email": p.email,
-                "full_name": p.full_name,
-                "phone_number": p.phone_number,
-                "city": p.city,
-                "postal_code": p.postal_code,
-                "premise_type": p.premise_type,
-                "household_size": p.household_size,
-                "upi_id": p.upi_id,
-                "profile_complete": getattr(p, "profile_complete", False),
-                "created_at": p.created_at.isoformat() if getattr(p, "created_at", None) else None
-            }
-            for p in records
-        ]
-        return {"status": "success", "table": "user_profiles", "count": len(data), "data": data}
-
-    elif table_lower in ["trash", "recycling", "recycling_entries", "queued_trash"]:
-        records = db.query(RecyclingEntry).all()
-        data = [
-            {
-                "entry_id": r.entry_id,
-                "user_id": r.user_id,
-                "waste_category": r.waste_category,
-                "weight_kg": float(r.weight_kg),
-                "payout_amount": float(r.payout_amount),
-                "status": getattr(r, "status", "pending")
-            }
-            for r in records
-        ]
-        return {"status": "success", "table": "recycling_entries", "count": len(data), "data": data}
-
-    else:
-        logger.warning(f"⚠️ [SHOW DATA BAD REQUEST] Unknown table name '{table}'")
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Unknown table parameter '{table}'."
-        )
 
 # --- Household Pending Trash Entries for Staff Review ---
 
@@ -863,9 +843,9 @@ async def download_receipt(entry_id: int, db: Session = Depends(get_db)):
         }
     )
 
+
 # --- REVIEW (Approve / Decline) Waste Entry ---
 
-# main_3.py
 @app.post("/api/staff/entries/{entry_id}/review")
 async def review_recycling_entry(
     entry_id: int, 
@@ -893,3 +873,8 @@ async def review_recycling_entry(
         
     db.commit()
     return {"status": "success", "message": f"Entry #{entry_id} updated to {new_status}."}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("py_scripts.main:app", host="0.0.0.0", port=8000, reload=True)

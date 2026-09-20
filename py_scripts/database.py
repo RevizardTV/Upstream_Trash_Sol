@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Generator, List, Optional
+import os
 
 from sqlalchemy import (
     DateTime,
@@ -24,10 +25,17 @@ from sqlalchemy.orm import (
 
 from py_scripts.config import config
 
-# 1. Database Connection Engine
+# SSL Configuration
+ssl_args = {}
+ca_path = "/etc/ssl/certs/ca-certificates.crt"
+
+if os.path.exists(ca_path):
+    ssl_args = {"ssl": {"ca": ca_path}}
+
+# 1. Engine Creation
 engine = create_engine(
     config.DB_URL,
-    connect_args={"ssl": {"ca": "/etc/ssl/certs/ca-certificates.crt"}},
+    connect_args=ssl_args,
     pool_pre_ping=True,
 )
 
@@ -50,12 +58,10 @@ class StaffProfile(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     assigned_pincode: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     
-    # Dual default prevents MySQL 1364 if DB column lacks DEFAULT expression
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), server_default=func.now(), nullable=False
     )
 
-    # Relationships
     reviewed_entries: Mapped[List["RecyclingEntry"]] = relationship(
         "RecyclingEntry", back_populates="reviewed_by_staff"
     )
@@ -74,13 +80,11 @@ class UserProfile(Base):
     household_size: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     upi_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     
-    # Explicit defaults for MySQL compatibility
     profile_complete: Mapped[bool] = mapped_column(default=True, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), server_default=func.now(), nullable=False
     )
 
-    # Bidirectional Relationship (Option 2 aligned)
     recycling_entries: Mapped[List["RecyclingEntry"]] = relationship(
         "RecyclingEntry", back_populates="user", cascade="all, delete-orphan"
     )
@@ -94,6 +98,7 @@ class RecyclingEntry(Base):
     waste_category: Mapped[str] = mapped_column(String(100), nullable=False)
     weight_kg: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     payout_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    station_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # <-- Added missing column
     
     status: Mapped[str] = mapped_column(
         Enum("pending", "approved", "declined", name="status_enum"),
@@ -110,7 +115,6 @@ class RecyclingEntry(Base):
         DateTime, default=func.now(), server_default=func.now(), nullable=False
     )
 
-    # Relationships
     user: Mapped["UserProfile"] = relationship("UserProfile", back_populates="recycling_entries")
     reviewed_by_staff: Mapped[Optional["StaffProfile"]] = relationship(
         "StaffProfile", back_populates="reviewed_entries"

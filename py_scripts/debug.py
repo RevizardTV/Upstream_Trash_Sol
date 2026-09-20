@@ -3,13 +3,14 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from py_scripts.database import get_db, UserProfile, RecyclingEntry, StaffProfile
 from py_scripts.config import config
-
+from typing import Optional
 router = APIRouter(prefix="/api/admin", tags=["Admin Debug"])
 
-def verify_admin_access(x_admin_secret: str = Header(None)):
+def verify_admin_access(x_admin_secret: Optional[str] = Header(None, alias="x-admin-secret")):
     """Security dependency ensuring admin actions are signed with server secret."""
     secret_key = getattr(config, "EM_RESET_KEY", None)
-    if secret_key and x_admin_secret != secret_key:
+    
+    if not secret_key or not x_admin_secret or x_admin_secret != secret_key:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized: Invalid administrative authorization token."
@@ -17,7 +18,6 @@ def verify_admin_access(x_admin_secret: str = Header(None)):
 
 @router.get("/show-profiles", dependencies=[Depends(verify_admin_access)])
 async def show_profiles(db: Session = Depends(get_db)):
-    """Fetch all registered user profiles (Protected)."""
     profiles = db.query(UserProfile).all()
     data = [
         {
@@ -38,7 +38,6 @@ async def show_profiles(db: Session = Depends(get_db)):
 
 @router.get("/show-staff", dependencies=[Depends(verify_admin_access)])
 async def show_staff_profiles(db: Session = Depends(get_db)):
-    """Extract and display all registered staff profiles (Protected)."""
     staff_members = db.query(StaffProfile).all()
     data = [
         {
@@ -46,7 +45,6 @@ async def show_staff_profiles(db: Session = Depends(get_db)):
             "email": s.email,
             "full_name": s.full_name,
             "assigned_pincode": s.assigned_pincode,
-            # Note: password_hash is intentionally omitted from returning payloads for safety
             "created_at": s.created_at.isoformat() if s.created_at else None
         }
         for s in staff_members
@@ -55,7 +53,6 @@ async def show_staff_profiles(db: Session = Depends(get_db)):
 
 @router.get("/show-data", dependencies=[Depends(verify_admin_access)])
 async def show_data(table: str = Query(...), db: Session = Depends(get_db)):
-    """Inspect tables dynamically (Protected)."""
     table_lower = table.lower()
     
     if table_lower in ["profile", "profiles", "user_profiles"]:
