@@ -1,0 +1,29 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Production output / Build artifacts
+/dist
+/.svelte-kit
+/build
+
+# Local environment variables
+.env
+.env.*
+!.env.example
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+bun.lockb
+
+# Editor and OS junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
