@@ -1,12 +1,9 @@
 <script lang="ts">
-	import favicon from '#lib/assets/favicon.svg';
-	import type { LayoutProps } from './$types';
+    import '../app.css'; // Global Tailwind styles
 
-	let { children }: LayoutProps = $props();
+    let { children } = $props();
 </script>
 
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
-
-{@render children()}
+<div class="min-h-screen bg-slate-950 text-stone-100 selection:bg-emerald-500 selection:text-slate-950">
+    {@render children()}
+</div>
