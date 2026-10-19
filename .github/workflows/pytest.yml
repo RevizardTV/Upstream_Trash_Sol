@@ -35,30 +35,30 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install pytest pytest-cov httpx
+          pip install pytest pytest-cov httpx pymysql cryptography
 
       - name: Run Database Tests
         env:
-          DB_USER: root
-          DB_PASSWORD: password
-          DB_HOST: localhost
-          DB_PORT: 3306
-          DB_NAME: ecorecycle_test
+          DB_USER: ${{ secrets.TIDB_USER }}
+          DB_PASSWORD: ${{ secrets.TIDB_PASSWORD }}
+          DB_HOST: ${{ secrets.TIDB_HOST }}
+          DB_PORT: ${{ secrets.TIDB_PORT }}
+          DB_NAME: ${{ secrets.TIDB_DATABASE }}
           REDIS_URL: redis://localhost:6379
-          RESEND_API_KEY: mock_resend_key
-          EM_RESET_KEY: mock_secret_key
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EM_RESET_KEY: ${{ secrets.EM_RESET_KEY }}
         run: |
           pytest tests/test_db.py -v
 
       - name: Run API & Integration Tests
         env:
-          DB_USER: root
-          DB_PASSWORD: password
-          DB_HOST: localhost
-          DB_PORT: 3306
-          DB_NAME: ecorecycle_test
+          DB_USER: ${{ secrets.TIDB_USER }}
+          DB_PASSWORD: ${{ secrets.TIDB_PASSWORD }}
+          DB_HOST: ${{ secrets.TIDB_HOST }}
+          DB_PORT: ${{ secrets.TIDB_PORT }}
+          DB_NAME: ${{ secrets.TIDB_DATABASE }}
           REDIS_URL: redis://localhost:6379
-          RESEND_API_KEY: mock_resend_key
-          EM_RESET_KEY: mock_secret_key
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EM_RESET_KEY: ${{ secrets.EM_RESET_KEY }}
         run: |
-          pytest tests/test_api.py -v
+          pytest
