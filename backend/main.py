@@ -88,7 +88,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 origins = [
     "http://localhost:5173", # SvelteKit Dev Server
     "http://localhost:8000",
-    "https://upstream-trash-sol.onrender.com"
+    "https://upstream-trash-sol.onrender.com",
+    "https://upstream-trash-sol-front.onrender.com"
 ]
 
 app.add_middleware(
