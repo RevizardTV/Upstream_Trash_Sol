@@ -48,7 +48,7 @@ async def get_reviewed_requests(user_id: Optional[int] = Query(None), email: Opt
         user_id = user.id
 
     entries = db.query(RecyclingEntry).filter(RecyclingEntry.user_id == user_id, RecyclingEntry.status.in_(["approved", "declined"])).all()
-    return {"status": "success", "entries": [{"entry_id": e.entry_id, "waste_category": e.waste_category, "weight_kg": float(e.weight_kg), "payout_amount": float(e.payout_amount), "status": e.status} for e in entries]}
+    return {"status": "success", "entries": [{"entry_id": e.entry_id,"rejection_reason": e.rejection_reason, "waste_category": e.waste_category, "weight_kg": float(e.weight_kg), "payout_amount": float(e.payout_amount), "status": e.status} for e in entries]}
 
 @router.get("/summary")
 async def get_user_recycling_summary(user_id: Optional[int] = Query(None), email: Optional[str] = Query(None), db: Session = Depends(get_db)):

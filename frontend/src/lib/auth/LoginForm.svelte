@@ -141,7 +141,7 @@
                         id="otpInput" 
                         required 
                         maxlength="6" 
-                        pattern="\d{6}" 
+                         
                         bind:value={otpCode}
                         placeholder="000000" 
                         class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-center tracking-widest font-mono text-slate-200 focus:outline-none focus:border-emerald-500"

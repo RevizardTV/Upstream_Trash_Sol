@@ -1,9 +1,14 @@
 <script lang="ts">
     import '../app.css';
+    import axios from 'axios';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { page } from '$app/state';
-     // Adjust path if your CSS file is located elsewhere (e.g., './styles.css')
+
+    // Configure global Axios defaults for all components across the app
+    axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    axios.defaults.withCredentials = true;
+
     let { children } = $props();
 
     onMount(() => {
@@ -26,6 +31,8 @@
 <svelte:head>
     <!-- Global Redis Inspection & Management Console Toolkit -->
     <script src="/js/redis_check.js"></script>
+    <!-- Database Admin Debug Toolkit -->
+    <script src="/js/debug.js"></script>
 </svelte:head>
 
 {@render children()}

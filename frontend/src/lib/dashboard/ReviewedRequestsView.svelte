@@ -29,7 +29,7 @@
                         <th class="pb-3 px-4">Weight (kg)</th>
                         <th class="pb-3 px-4">Amount</th>
                         <th class="pb-3 px-4">Status</th>
-                        <th class="pb-3 px-4 text-right">Record</th>
+                        <th class="pb-3 px-4 text-right">Record / Reason</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-700/40">
@@ -60,10 +60,15 @@
                                             <i class="fa-solid fa-file-arrow-down text-sm"></i> <span>Receipt</span>
                                         </a>
                                     {:else}
-                                        <span class="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 font-medium">
-                                            <i class="fa-solid fa-triangle-exclamation text-xs"></i>
-                                            <span class="truncate">{e.rejection_reason || 'Declined'}</span>
-                                        </span>
+                                        <div class="inline-flex items-center justify-end">
+                                            <span 
+                                                class="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 font-medium max-w-[240px] text-left"
+                                                title={e.rejection_reason || 'Declined by district officer'}
+                                            >
+                                                <i class="fa-solid fa-triangle-exclamation text-xs shrink-0"></i>
+                                                <span class="truncate">{e.rejection_reason || 'Declined by district officer'}</span>
+                                            </span>
+                                        </div>
                                     {/if}
                                 </td>
                             </tr>

@@ -69,7 +69,7 @@ async def get_district_users(
     query = db.query(UserProfile).filter(
         UserProfile.postal_code.isnot(None),
         UserProfile.postal_code.like(f"{district_prefix}%"),
-        UserProfile.profile_complete == False
+        UserProfile.profile_complete == True
     )
 
     if search:

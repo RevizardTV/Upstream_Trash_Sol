@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
 import redis.asyncio as redis
-
+from fastapi import APIRouter, HTTPException
 # Database Engine
 from backend.database import engine
 from backend.models import Base
@@ -120,6 +120,40 @@ async def staff_logout():
     for cookie in ["user_authenticated", "session_authenticated", "staff_authenticated"]:
         response.delete_cookie(key=cookie, path="/")
     return response
+
+# --- Redis Inspector Router ---
+
+router = APIRouter(prefix="/api/redis", tags=["Redis Inspector"])
+
+@router.get("/entries")
+async def get_redis_entries():
+    try:
+        keys = await redis_client.keys("*")
+        entries = {}
+        
+        for key in keys:
+            key_type = await redis_client.type(key)
+            
+            if key_type == "string":
+                entries[key] = await redis_client.get(key)
+            elif key_type == "hash":
+                entries[key] = await redis_client.hgetall(key)
+            elif key_type == "list":
+                entries[key] = await redis_client.lrange(key, 0, -1)
+            elif key_type == "set":
+                entries[key] = list(await redis_client.smembers(key))
+            elif key_type == "zset":
+                entries[key] = await redis_client.zrange(key, 0, -1, withscores=True)
+            else:
+                entries[key] = f"[{key_type} type]"
+                
+        return {"entries": entries}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+app.include_router(router)
+
+app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
