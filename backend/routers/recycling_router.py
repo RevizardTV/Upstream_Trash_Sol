@@ -3,7 +3,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional
 import io
-from backend.database import get_db, UserProfile, RecyclingEntry
+from backend.models import UserProfile, RecyclingEntry
+from backend.database import get_db
 from backend.custom_logging import logger
 from backend.schemas import RecyclingEntrySchema
 from pdf_generator import generate_receipt_pdf

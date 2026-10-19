@@ -1,6 +1,6 @@
 <script lang="ts">
-    import StaffLoginForm from '$lib/staff-login/StaffLoginForm.svelte';
-    import StaffOtpForm from '$lib/staff-login/StaffOtpForm.svelte';
+    import StaffLoginForm from '#lib/staff-login/StaffLoginForm.svelte';
+    import StaffOtpForm from '#lib/staff-login/StaffOtpForm.svelte';
 
     let isOtpStage = $state(false);
     let errorMessage = $state('');

@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 import bcrypt
-from backend.database import get_db, StaffProfile, UserProfile, RecyclingEntry
+from backend.models import StaffProfile, UserProfile, RecyclingEntry
+from backend.database import get_db
 from backend.custom_logging import logger, log_auth_event
 from backend.otp_service import extract_client_ip, process_otp_request
 from backend.schemas import StaffRegisterSchema, StaffLoginSchema, EntryReviewSchema

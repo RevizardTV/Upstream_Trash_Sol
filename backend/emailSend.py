@@ -1,46 +1,59 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, status
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-from backend.models import Base
-from backend.config import config
-from backend.redis_client import redis_client
-from typing import Optional
+import resend
+from resend.exceptions import ResendError
 
-router = APIRouter(prefix="/api/admin", tags=["Admin Debug"])
+try:
+    from backend.config import config
+except ImportError:
+    from config import config
 
-def verify_admin_secret(
-    x_secret_key: Optional[str] = Header(None, alias="x-secret-key"),
-    x_admin_secret: Optional[str] = Header(None, alias="x-admin-secret")
-):
-    """Security dependency supporting both x-secret-key and x-admin-secret headers."""
-    secret_key = getattr(config, "EM_RESET_KEY", None)
-    provided_key = x_secret_key or x_admin_secret
-    
-    if not secret_key or not provided_key or provided_key != secret_key:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized: Invalid administrative authorization token."
-        )
+def get_user_email_template(otp_code: str) -> str:
+    """Template for Household User Login / Profile Verification."""
+    return f"""
+    <div style="font-family: Arial, sans-serif; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 500px;">
+        <h2 style="color: #059669; margin-top: 0;">EcoRecycle — Verification Code</h2>
+        <p style="color: #334155; font-size: 14px;">Hello! Use the code below to verify your household account.</p>
+        <div style="font-size: 28px; font-weight: bold; color: #059669; letter-spacing: 4px; background: #f0fdf4; padding: 12px 20px; border-radius: 6px; display: inline-block; margin: 16px 0;">
+            {otp_code}
+        </div>
+        <p style="color: #64748b; font-size: 12px; margin-bottom: 0;">
+            This code expires in 60 seconds. If you did not request this, please ignore this email.
+        </p>
+    </div>
+    """
 
-@router.get("/redis-inspect", dependencies=[Depends(verify_admin_secret)])
-async def redis_inspect():
+def get_staff_email_template(otp_code: str) -> str:
+    """Template for Staff Authorization & Registration."""
+    return f"""
+    <div style="font-family: Arial, sans-serif; padding: 24px; border: 1px solid #cbd5e1; border-radius: 8px; max-width: 500px; background-color: #f8fafc;">
+        <h2 style="color: #0f172a; margin-top: 0;">EcoRecycle Staff Portal</h2>
+        <p style="color: #334155; font-size: 14px;">Official Authorization Request for District Staff Registration.</p>
+        <div style="font-size: 28px; font-weight: bold; color: #2563eb; letter-spacing: 4px; background: #eff6ff; padding: 12px 20px; border: 1px solid #bfdbfe; border-radius: 6px; display: inline-block; margin: 16px 0;">
+            {otp_code}
+        </div>
+        <p style="color: #64748b; font-size: 12px; margin-bottom: 0;">
+            Security Notice: Do not share this operational security key. Code expires in 60 seconds.
+        </p>
+    </div>
+    """
+
+resend.api_key = config.RESEND_API_KEY
+
+async def send_email(to_email: str, subject: str, body: str, email_type: str = "user"):
+    """Sends an email securely using Resend's Async SDK."""
+    template = get_staff_email_template(body) if email_type == "staff" else get_user_email_template(body)
+
     try:
-        keys = await redis_client.keys("*")
-        records = []
-        for k in keys:
-            ttl = await redis_client.ttl(k)
-            val = await redis_client.get(k)
-            if val is None:
-                val = str(await redis_client.type(k))
-            records.append({"key": k, "ttl_seconds": ttl, "value": val})
-        return {"status": "success", "records": records}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/emergency-reset", dependencies=[Depends(verify_admin_secret)])
-async def emergency_reset():
-    try:
-        await redis_client.flushall()
-        return {"status": "success", "message": "Redis database flushed successfully."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        params: resend.Emails.SendParams = {
+            "from": "EcoRecycle Auth <onboarding@resend.dev>",
+            "to": [to_email],
+            "subject": subject,
+            "html": template
+        }
+        
+        email_response = await resend.Emails.send_async(params)
+        print(f"RESEND SUCCESS: [{email_type.upper()}] Email sent successfully! ID: {email_response.get('id')}")
+        return email_response
+        
+    except ResendError as e:
+        print(f"RESEND UTILITY ERROR: Failed to dispatch mail via API. Details: {e}")
+        raise e

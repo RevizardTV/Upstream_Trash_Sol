@@ -2,9 +2,9 @@
     import { onMount } from 'svelte';
     import axios from 'axios';
     import { goto } from '$app/navigation';
-    import StaffHeader from '$lib/staff-dashboard/StaffHeader.svelte';
-    import FilterSection from '$lib/staff-dashboard/FilterSection.svelte';
-    import HouseholdProfilesTable from '$lib/staff-dashboard/HouseholdProfilesTable.svelte';
+    import StaffHeader from '#lib/staff-dashboard/StaffHeader.svelte';
+    import FilterSection from '#lib/staff-dashboard/FilterSection.svelte';
+    import HouseholdProfilesTable from '#lib/staff-dashboard/HouseholdProfilesTable.svelte';
 
     let staffEmail = $state('');
     let staffPincode = $state('');

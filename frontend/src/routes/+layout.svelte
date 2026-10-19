@@ -1,8 +1,9 @@
 <script lang="ts">
+    import '../app.css';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { page } from '$app/state';
-
+     // Adjust path if your CSS file is located elsewhere (e.g., './styles.css')
     let { children } = $props();
 
     onMount(() => {

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import StaffRegisterForm from '$lib/staff/StaffRegisterForm.svelte';
-    import StaffOtpVerificationBox from '$lib/staff/StaffOtpVerificationBox.svelte';
+    import StaffRegisterForm from '#lib/staff/StaffRegisterForm.svelte';
+    import StaffOtpVerificationBox from '#lib/staff/StaffOtpVerificationBox.svelte';
 
     let isOtpSent = $state(false);
     let registeredEmail = $state('');

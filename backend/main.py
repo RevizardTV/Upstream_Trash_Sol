@@ -9,7 +9,8 @@ from fastapi.exceptions import RequestValidationError
 import redis.asyncio as redis
 
 # Database Engine
-from backend.database import Base, engine
+from backend.database import engine
+from backend.models import Base
 
 # Debug & Core Utilities
 from backend.debug import router as debug_router

@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
-from backend.database import get_db, UserProfile
+from backend.models import UserProfile
+from backend.database import get_db
 from backend.custom_logging import logger
 
 router = APIRouter(prefix="/api/user", tags=["User Profile"])

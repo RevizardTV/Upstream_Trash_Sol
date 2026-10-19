@@ -1,12 +1,12 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import axios from 'axios';
-    import Sidebar from '$lib/dashboard/Sidebar.svelte';
-    import PaymentOptionsView from '$lib/dashboard/PaymentOptionsView.svelte';
-    import RegisterPaymentView from '$lib/dashboard/RegisterPaymentView.svelte';
-    import PendingQueueView from '$lib/dashboard/PendingQueueView.svelte';
-    import ReviewedRequestsView from '$lib/dashboard/ReviewedRequestsView.svelte';
-    import PaytGuideView from '$lib/dashboard/PaytGuideView.svelte';
+    import Sidebar from '#lib/dashboard/Sidebar.svelte';
+    import PaymentOptionsView from '#lib/dashboard/PaymentOptionsView.svelte';
+    import RegisterPaymentView from '#lib/dashboard/RegisterPaymentView.svelte';
+    import PendingQueueView from '#lib/dashboard/PendingQueueView.svelte';
+    import ReviewedRequestsView from '#lib/dashboard/ReviewedRequestsView.svelte';
+    import PaytGuideView from '#lib/dashboard/PaytGuideView.svelte';
 
     let activeView = $state('view-options');
     let currentUser = $state<any>(null);

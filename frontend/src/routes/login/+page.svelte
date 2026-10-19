@@ -1,5 +1,5 @@
 <script lang="ts">
-    import LoginHeader from '$lib/auth/LoginHeader.svelte';
+    import LoginHeader from '#lib/auth/LoginHeader.svelte';
     import LoginForm from '#lib/auth/LoginForm.svelte';
 </script>
 

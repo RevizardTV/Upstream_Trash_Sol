@@ -1,5 +1,5 @@
 <script lang="ts">
-    import PendingEntriesTable from '$lib/staff-dashboard/PendingEntriesTable.svelte';
+    import PendingEntriesTable from '#lib/staff-dashboard/PendingEntriesTable.svelte';
 
     type Profile = {
         id: number;

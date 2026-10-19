@@ -1,6 +1,6 @@
 <script lang="ts">
-    import ProfileForm from '$lib/profile/ProfileForm.svelte';
-    import OtpVerificationBox from '$lib/profile/OtpVerificationBox.svelte';
+    import ProfileForm from '#lib/profile/ProfileForm.svelte';
+    import OtpVerificationBox from '#lib/profile/OtpVerificationBox.svelte';
 
     let isOtpSent = $state(false);
     let registeredEmail = $state('');

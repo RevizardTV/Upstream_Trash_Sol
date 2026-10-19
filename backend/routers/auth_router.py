@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from backend.database import get_db, UserProfile, StaffProfile
+from backend.models import StaffProfile, UserProfile
+from backend.database import get_db
 from backend.custom_logging import logger
 from backend.otp_service import OTPRequest, OTPVerify, extract_client_ip, process_otp_request, process_otp_verification
 from backend.schemas import ProfileCreateSchema

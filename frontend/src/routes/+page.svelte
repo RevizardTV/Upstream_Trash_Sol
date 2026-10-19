@@ -1,7 +1,7 @@
 <script lang="ts">
-    import Navbar from '$lib/ui/Navbar.svelte';
-    import HeroSection from '$lib/ui/HeroSection.svelte';
-    import PaytExplanation from '$lib/ui/PayExplanation.svelte';
+    import Navbar from '#lib/ui/Navbar.svelte';
+    import HeroSection from '#lib/ui/HeroSection.svelte';
+    import PaytExplanation from '#lib/ui/PayExplanation.svelte';
     import { goto } from '$app/navigation';
 
     function handleLoginRedirect() {
