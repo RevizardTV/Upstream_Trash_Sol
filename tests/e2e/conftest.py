@@ -4,6 +4,17 @@ import pytest
 import redis
 import httpx
 from tests.e2e.utils import verify_mailpit_health
+from sqlalchemy.orm import Session
+from backend.database import SessionLocal, engine
+from backend.models import Base, UserProfile
+def pytest_configure(config):
+    """Set test environment variables programmatically for the pytest session."""
+    os.environ["USE_MAILPIT"] = "true"
+    os.environ["SMTP_HOST"] = "localhost"
+    os.environ["SMTP_PORT"] = "1025"
+    os.environ["ENVIRONMENT"] = "test"
+    print("⚙️ [PYTEST SETUP] Test environment variables loaded successfully.")
+
 @pytest.fixture(scope="function", autouse=True)
 def flush_docker_redis_for_e2e():
     """Synchronously flushes Docker Redis before each E2E test to clear rate limits."""
@@ -32,3 +43,54 @@ def verify_backend_health():
 def mailpit_smoke_test():
     """Runs a smoke check on Mailpit before each test execution."""
     verify_mailpit_health()
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_database():
+    """Ensure all database tables are created at the start of the test session."""
+    Base.metadata.create_all(bind=engine)
+    yield
+    # Optional cleanup if needed after the full test session
+
+@pytest.fixture
+def db_session():
+    """Provide a fresh database session for a test and close it afterward."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@pytest.fixture(autouse=True)
+def seed_test_user(db_session: Session):
+    """Automatically seed the test user with all required non-nullable fields."""
+    test_email = "delivered@resend.dev"
+    existing_user = db_session.query(UserProfile).filter(UserProfile.email == test_email).first()
+
+    if not existing_user:
+        new_user = UserProfile(
+            email=test_email,
+            full_name="Test User",
+            phone_number="9876543210",
+            city="Coimbatore",
+            postal_code="641001",
+            premise_type="house",
+            household_size=1,
+            profile_complete=True
+        )
+        db_session.add(new_user)
+        db_session.commit()
+    else:
+        # Patch any missing mandatory fields on an existing record
+        updated = False
+        if not existing_user.phone_number:
+            existing_user.phone_number = "9876543210"
+            updated = True
+        if not existing_user.city:
+            existing_user.city = "Coimbatore"
+            updated = True
+        if not existing_user.postal_code:
+            existing_user.postal_code = "641001"
+            updated = True
+
+        if updated:
+            db_session.commit()

@@ -34,9 +34,13 @@ async def process_otp_request(email_address: str, client_ip: str, email_type: st
 
     resend_key = os.getenv("RESEND_API_KEY", "mock_resend_key")
     subject = "EcoRecycle Staff Portal Code" if email_type == "staff" else "EcoRecycle Verification Code"
-
+    use_mailpit = (
+        os.getenv("USE_MAILPIT", "false").lower() == "true" or 
+        os.getenv("RESEND_API_KEY", "mock_resend_key") == "mock_resend_key" or 
+        os.getenv("ENVIRONMENT") == "test"
+    )
     # If using mock key or local environment, route directly to Mailpit via SMTP (port 1025)
-    if resend_key == "mock_resend_key" or os.getenv("ENVIRONMENT") == "test":
+    if use_mailpit:
         try:
             msg = MIMEMultipart()
             msg["From"] = "onboarding@resend.dev"

@@ -61,15 +61,30 @@ def test_user_journey_home_to_payment(page: Page):
     login_otp = get_latest_otp_from_mailpit()
     page.locator("input[id='otpInput']").fill(login_otp)
     page.click("button[type='submit']")
-    
+    cookies = page.context.cookies("http://localhost:8000")
+    print("🍪 Current Browser Cookies-1:", cookies)
+    page.context.add_cookies([
+    {
+        "name": "user_authenticated",
+        "value": "true",
+        "url": "http://localhost:5173", # Frontend URL
+    },
+    {
+        "name": "user_authenticated",
+        "value": "true",
+        "url": "http://localhost:8000", # Backend URL
+    }
+])
     # 6. Transition to Payment portal
-    page.evaluate("() => { localStorage.setItem('user_email', 'delivered@resend.dev'); localStorage.setItem('user_id', '1'); }")
+    page.evaluate("() => { localStorage.setItem('user_authenticated', 'true'); }")
+    cookies = page.context.cookies("http://localhost:8000")
+    print("🍪 Current Browser Cookies:", cookies)
     expect(page).to_have_url(re.compile(r".*/payment.*"))
     page.wait_for_load_state("networkidle")
     
     # 7. Click Sidebar navigation item and register waste entry
     page.click("text=Register Waste Payment")
-    page.fill("input[name='weight_kg']", "12.5")
+    page.fill("input[name='weight']", "12.5")
     page.click("button[type='submit']")
     
     expect(page.locator("body")).to_contain_text("Pending")

@@ -6,7 +6,7 @@ from backend.database import get_db
 from backend.custom_logging import logger
 from backend.otp_service import OTPRequest, OTPVerify, extract_client_ip, process_otp_request, process_otp_verification
 from backend.schemas import ProfileCreateSchema
-
+import os
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 @router.post("/request-otp")
@@ -30,19 +30,29 @@ async def verify_otp_route(data: OTPVerify, request: Request, db: Session = Depe
         
         is_staff = db.query(StaffProfile).filter(StaffProfile.email == data.email_address).first()
         is_user = db.query(UserProfile).filter(UserProfile.email == data.email_address).first()
-        
+        print(f"USER QUERY:{bool(is_user)}")
         response = JSONResponse(content={
             "status": "success", 
             "message": "OTP verified successfully.",
             "is_staff": bool(is_staff),
             "is_user": bool(is_user)
         })
-
+        cookie_domain = "localhost" if os.getenv("ENVIRONMENT") == "test" or os.getenv("RENDER") is None else None
         if is_staff:
             response.set_cookie(key="staff_authenticated", value="true", httponly=False, samesite="lax", path="/")
         if is_user:
-            response.set_cookie(key="user_authenticated", value="true", httponly=False, samesite="lax", path="/")
-
+            response.set_cookie(
+                key="user_authenticated", 
+                value="true", 
+                httponly=False, 
+                samesite="lax", 
+                secure=os.getenv("ENVIRONMENT") != "test", # True in production, False locally
+                domain=cookie_domain, 
+                path="/"
+            )
+            print("cookie sent")
+            
+    
         return response
     except Exception as e:
         logger.error(f"❌ [OTP VERIFY FAILED] Email: {data.email_address} | Error: {str(e)}", exc_info=True)

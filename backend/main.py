@@ -47,7 +47,7 @@ app.add_middleware(PerformanceLoggingMiddleware)
 @app.middleware("http")
 async def enforce_strict_route_cookie_scopes(request: Request, call_next):
     path = request.url.path
-    if path.startswith("/static") or path.startswith("/api"):
+    if path.startswith("/api"):
         return await call_next(request)
 
     response = await call_next(request)

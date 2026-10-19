@@ -14,6 +14,11 @@ async def get_user_profile(
     user_authenticated: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    query = db.query(UserProfile)
+    user = query.filter(UserProfile.id == user_id).first() if user_id else query.filter(UserProfile.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User profile not found-URGENT")
+    
     if user_authenticated != "true":
         raise HTTPException(status_code=401, detail="Unauthorized session")
 
