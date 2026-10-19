@@ -35,7 +35,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install -r requirements.txt
           pip install pytest pytest-cov httpx pymysql cryptography
 
       - name: Run Database Tests
@@ -62,4 +62,16 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EM_RESET_KEY: ${{ secrets.EM_RESET_KEY }}
         run: |
-          pytest
+          pytest tests/unit
+      - name: Run e2e tests
+        env:
+          DB_USER: ${{ secrets.TIDB_USER }}
+          DB_PASSWORD: ${{ secrets.TIDB_PASSWORD }}
+          DB_HOST: ${{ secrets.TIDB_HOST }}
+          DB_PORT: ${{ secrets.TIDB_PORT }}
+          DB_NAME: ${{ secrets.TIDB_DATABASE }}
+          REDIS_URL: redis://localhost:6379
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EM_RESET_KEY: ${{ secrets.EM_RESET_KEY }}
+        run: |
+          pytest tests/e2e

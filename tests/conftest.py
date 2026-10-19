@@ -61,4 +61,4 @@ async def mock_redis():
     """Provides a fake asynchronous Redis instance using fakeredis for unit tests."""
     fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     yield fake_redis
-    await fake_redis.close()
+    await fake_redis.aclose()
