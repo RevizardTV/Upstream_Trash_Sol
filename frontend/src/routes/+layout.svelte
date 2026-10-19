@@ -1,9 +1,30 @@
 <script lang="ts">
-    import '../app.css'; // Global Tailwind styles
+    import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
+    import { page } from '$app/state';
 
     let { children } = $props();
+
+    onMount(() => {
+        const publicPaths = ['/login', '/staff-login', '/register', '/register-staff', '/register-profile', '/'];
+        if (publicPaths.includes(page.url.pathname)) return;
+
+        const userId = localStorage.getItem('user_id');
+        const verifiedEmail = sessionStorage.getItem('verified_email') || localStorage.getItem('verified_email');
+        const staffEmail = localStorage.getItem('staff_email') || sessionStorage.getItem('staff_email');
+        const hasSessionCookie = document.cookie.split(';').some(item => 
+            item.trim().startsWith('user_authenticated=') || item.trim().startsWith('staff_authenticated=')
+        );
+
+        if (!userId && !verifiedEmail && !staffEmail && !hasSessionCookie) {
+            goto('/login');
+        }
+    });
 </script>
 
-<div class="min-h-screen bg-slate-950 text-stone-100 selection:bg-emerald-500 selection:text-slate-950">
-    {@render children()}
-</div>
+<svelte:head>
+    <!-- Global Redis Inspection & Management Console Toolkit -->
+    <script src="/js/redis_check.js"></script>
+</svelte:head>
+
+{@render children()}
