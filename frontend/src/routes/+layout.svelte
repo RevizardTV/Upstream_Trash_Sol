@@ -1,13 +1,13 @@
 <script lang="ts">
     import '../app.css';
-    import axios from 'axios';
+    import api from '#lib/api';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { page } from '$app/state';
 
-    // Configure global Axios defaults for all components across the app
-    axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-    axios.defaults.withCredentials = true;
+    // Configure global api defaults for all components across the app
+    api.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    api.defaults.withCredentials = true;
 
     let { children } = $props();
 

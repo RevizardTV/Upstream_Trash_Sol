@@ -1,5 +1,5 @@
 <script lang="ts">
-    import axios from 'axios';
+    import api from '#lib/api';
 
     type Props = {
         onOtpSent: (email: string, profileData: any) => void;
@@ -30,7 +30,7 @@
 
         isLoading = true;
         try {
-            const res = await axios.post('/api/auth/request-otp', {
+            const res = await api.post('/api/auth/request-otp', {
                 email_address: email.trim()
             });
 

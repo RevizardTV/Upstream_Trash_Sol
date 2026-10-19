@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import axios from 'axios';
+    import api from '#lib/api';
     import { goto } from '$app/navigation';
 
     type Props = {
@@ -55,7 +55,7 @@
 
         isVerifying = true;
         try {
-            const response = await axios.post('/api/auth/verify-otp', {
+            const response = await api.post('/api/auth/verify-otp', {
                 email_address: email,
                 otp_code: otpCode.trim()
             });

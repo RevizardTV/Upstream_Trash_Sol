@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import axios from 'axios';
+    import api from '#lib/api';
     import { goto } from '$app/navigation';
     import StaffHeader from '#lib/staff-dashboard/StaffHeader.svelte';
     import FilterSection from '#lib/staff-dashboard/FilterSection.svelte';
@@ -32,14 +32,14 @@
         if (pin) url += `&exact_pincode=${encodeURIComponent(pin)}`;
 
         try {
-            const res = await axios.get(url);
+            const res = await api.get(url);
             if (res.status === 200) {
                 profiles = res.data.profiles || [];
 
                 // Fetch pending entries for each profile concurrently
                 const entryPromises = profiles.map(async (user: any) => {
                     try {
-                        const entriesRes = await axios.get(`/api/admin/user-pending-entries/${user.id}`);
+                        const entriesRes = await api.get(`/api/admin/user-pending-entries/${user.id}`);
                         return { userId: user.id, entries: entriesRes.data.entries || [] };
                     } catch {
                         return { userId: user.id, entries: [] };
@@ -77,7 +77,7 @@
         const staffId = localStorage.getItem('staff_id') || sessionStorage.getItem('staff_id');
 
         try {
-            const res = await axios.post(`/api/staff/entries/${entryId}/review`, {
+            const res = await api.post(`/api/staff/entries/${entryId}/review`, {
                 action: action,
                 rejection_reason: rejectionReason || null,
                 staff_id: staffId ? parseInt(staffId) : null

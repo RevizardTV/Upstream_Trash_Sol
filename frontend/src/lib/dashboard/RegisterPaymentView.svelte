@@ -1,5 +1,5 @@
 <script lang="ts">
-    import axios from 'axios';
+    import api from '#lib/api';
 
     type Props = {
         userId: number | null;
@@ -39,7 +39,7 @@
 
         isSubmitting = true;
         try {
-            await axios.post('/api/recycling/entry', {
+            await api.post('/api/recycling/entry', {
                 user_id: userId,
                 waste_category: currentCategory.label,
                 weight_kg: weight,

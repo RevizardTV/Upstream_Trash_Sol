@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import axios from 'axios';
+    import api from '#lib/api';
     import Sidebar from '#lib/dashboard/Sidebar.svelte';
     import PaymentOptionsView from '#lib/dashboard/PaymentOptionsView.svelte';
     import RegisterPaymentView from '#lib/dashboard/RegisterPaymentView.svelte';
@@ -37,7 +37,7 @@
 
         try {
             // Include credentials so session cookies are automatically forwarded
-            const res = await axios.get(`/api/user/profile?email=${encodeURIComponent(storedEmail)}`, {
+            const res = await api.get(`/api/user/profile?email=${encodeURIComponent(storedEmail)}`, {
                 withCredentials: true
             });
 
@@ -60,9 +60,9 @@
         if (!currentUser) return;
         try {
             const [summaryRes, pendingRes, reviewedRes] = await Promise.all([
-                axios.get(`/api/recycling/summary?user_id=${currentUser.id}`, { withCredentials: true }),
-                axios.get(`/api/recycling/pending-payments?user_id=${currentUser.id}`, { withCredentials: true }),
-                axios.get(`/api/recycling/reviewed-requests?user_id=${currentUser.id}`, { withCredentials: true })
+                api.get(`/api/recycling/summary?user_id=${currentUser.id}`, { withCredentials: true }),
+                api.get(`/api/recycling/pending-payments?user_id=${currentUser.id}`, { withCredentials: true }),
+                api.get(`/api/recycling/reviewed-requests?user_id=${currentUser.id}`, { withCredentials: true })
             ]);
 
             summaryData = summaryRes.data;

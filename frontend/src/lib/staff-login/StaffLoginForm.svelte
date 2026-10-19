@@ -1,5 +1,5 @@
 <script lang="ts">
-    import axios from 'axios';
+    import api from '#lib/api';
 
     type Props = {
         onLoginSuccess: (data: any) => void;
@@ -23,7 +23,7 @@
 
         isLoading = true;
         try {
-            const response = await axios.post('/api/staff/login', {
+            const response = await api.post('/api/staff/login', {
                 email: email.trim(),
                 password: password.trim()
             });

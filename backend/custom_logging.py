@@ -3,7 +3,7 @@ import time
 from logging.handlers import RotatingFileHandler
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-
+import sys
 # Configure Log Formatter
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 formatter = logging.Formatter(LOG_FORMAT)
@@ -18,8 +18,10 @@ security_file_handler = RotatingFileHandler("security.log", maxBytes=5_000_000, 
 security_file_handler.setFormatter(formatter)
 security_file_handler.setLevel(logging.INFO)
 
-# Console Output Handler
-console_handler = logging.StreamHandler()
+# --- Console Output Handler with UTF-8 Encoding Fix ---
+# Force standard output stream to use UTF-8 encoding to prevent Windows cp1252 charmap crashes on emojis
+utf8_stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
+console_handler = logging.StreamHandler(utf8_stdout)
 console_handler.setFormatter(formatter)
 console_handler.setLevel(logging.INFO)
 

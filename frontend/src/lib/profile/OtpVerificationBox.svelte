@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import axios from 'axios';
+    import api from '#lib/api';
     import { goto } from '$app/navigation';
 
     type Props = {
@@ -47,14 +47,14 @@
         isVerifying = true;
         try {
             // 1. Verify OTP
-            const verifyRes = await axios.post('/api/auth/verify-otp', {
+            const verifyRes = await api.post('/api/auth/verify-otp', {
                 email_address: email,
                 otp_code: otpCode.trim()
             });
 
             if (verifyRes.status === 200) {
                 // 2. Save Profile Details
-                const saveRes = await axios.post('/api/auth/complete-profile', profilePayload);
+                const saveRes = await api.post('/api/auth/complete-profile', profilePayload);
 
                 if (saveRes.status === 200 && saveRes.data.status === 'success') {
                     localStorage.setItem('user_id', saveRes.data.user_id);

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import axios from 'axios';
+    import api from '#lib/api';
 
     const API_URL = '/api/auth';
 
@@ -42,7 +42,7 @@
 
         isLoading = true;
         try {
-            await axios.post(`${API_URL}/request-otp`, { email_address: email.trim() });
+            await api.post(`${API_URL}/request-otp`, { email_address: email.trim() });
             sessionStorage.setItem('pending_email', email.trim());
             step = 'otp';
             startCountdownTimer(60);
@@ -60,7 +60,7 @@
 
         isLoading = true;
         try {
-            const response = await axios.post(`${API_URL}/verify-otp`, {
+            const response = await api.post(`${API_URL}/verify-otp`, {
                 email_address: email.trim(),
                 otp_code: otpCode.trim()
             });
