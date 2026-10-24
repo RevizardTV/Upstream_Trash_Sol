@@ -88,7 +88,7 @@
             required 
             placeholder="Enter 6-digit OTP" 
             maxlength="6" 
-            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-center tracking-widest text-slate-200 focus:outline-none focus:border-emerald-500 font-mono text-lg"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-center tracking-widest text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
         >
     </div>
 

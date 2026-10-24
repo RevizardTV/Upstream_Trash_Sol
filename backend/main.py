@@ -17,7 +17,7 @@ from backend.debug import router as debug_router
 from backend.config import config
 
 # Import Split Routers
-from backend.routers import auth_router, user_router, staff_router, recycling_router,websocket_router
+from backend.routers import auth_router, user_router, staff_router, recycling_router,websocket_router,payment_router
 
 # Logging Utilities
 from backend.custom_logging import PerformanceLoggingMiddleware, logger, extract_client_ip
@@ -107,7 +107,7 @@ app.include_router(auth_router.router)
 app.include_router(user_router.router)
 app.include_router(staff_router.router)
 app.include_router(recycling_router.router)
-
+app.include_router(payment_router.router)
 # Logout Endpoints
 @app.get("/logout")
 async def logout():

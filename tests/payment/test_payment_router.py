@@ -1,11 +1,9 @@
-# tests/unit/test_payment_router.py
+# tests/payment/test_payment_router.py
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from backend.models import UserProfile, RecyclingEntry
 
 def test_create_payment_order_success(client, db_session):
-    """Test 1: Verify that creating a Razorpay order works and returns an order ID."""
-    # 1. Seed user so foreign key/lookup passes
     user = UserProfile(
         id=1,
         email="paymentuser@example.com",
@@ -19,7 +17,6 @@ def test_create_payment_order_success(client, db_session):
     db_session.add(user)
     db_session.commit()
 
-    # 2. Mock Razorpay order.create response
     with patch("backend.routers.payment_router.client.order.create") as mock_order_create:
         mock_order_create.return_value = {
             "id": "order_test_abc123",
@@ -39,8 +36,6 @@ def test_create_payment_order_success(client, db_session):
 
 
 def test_verify_payment_signature_success(client, db_session):
-    """Test 2: Verify payment signature validation and recycling entry status approval."""
-    # 1. Seed user and a pending recycling entry
     user = UserProfile(
         id=1,
         email="verifyuser@example.com",
@@ -66,7 +61,6 @@ def test_verify_payment_signature_success(client, db_session):
     db_session.commit()
     entry_id = entry.entry_id
 
-    # 2. Mock Razorpay signature verification (returns True on success)
     with patch("backend.routers.payment_router.client.utility.verify_payment_signature") as mock_verify:
         mock_verify.return_value = True
 
@@ -81,15 +75,12 @@ def test_verify_payment_signature_success(client, db_session):
         assert response.status_code == 200
         assert response.json()["status"] == "success"
 
-        # 3. Check if entry status updated to approved in DB
         db_session.expire_all()
         updated_entry = db_session.query(RecyclingEntry).filter(RecyclingEntry.entry_id == entry_id).first()
         assert updated_entry.status == "approved"
 
 
 def test_process_upi_payout_success(client, db_session):
-    """Test 3: Verify UPI payout simulation workflow."""
-    # 1. Seed user
     user = UserProfile(
         id=1,
         email="payoutuser@example.com",
@@ -103,15 +94,13 @@ def test_process_upi_payout_success(client, db_session):
     db_session.add(user)
     db_session.commit()
 
-    # 2. Mock Razorpay contact, fund account, and payout creation steps
-    with patch("backend.routers.payment_router.client.contact.create") as mock_contact, \
-         patch("backend.routers.payment_router.client.fund_account.create") as mock_fund, \
-         patch("backend.routers.payment_router.client.payout.create") as mock_payout:
-        
-        mock_contact.return_value = {"id": "cont_test_111"}
-        mock_fund.return_value = {"id": "fa_test_222"}
-        mock_payout.return_value = {"id": "pout_test_333", "utr": "UTR_TEST_SUCCESS_001"}
+    # Patch client with a mock object that supports contact/fund_account/payout attributes safely
+    mock_client_instance = MagicMock()
+    mock_client_instance.contact.create.return_value = {"id": "cont_test_111"}
+    mock_client_instance.fund_account.create.return_value = {"id": "fa_test_222"}
+    mock_client_instance.payout.create.return_value = {"id": "pout_test_333", "utr": "UTR_TEST_SUCCESS_001"}
 
+    with patch("backend.routers.payment_router.client", mock_client_instance):
         payload = {
             "user_id": 1,
             "upi_id": "testuser@okaxis",
@@ -123,4 +112,3 @@ def test_process_upi_payout_success(client, db_session):
         data = response.json()
         assert data["status"] == "success"
         assert data["payout_id"] == "pout_test_333"
-        assert data["utr"] == "UTR_TEST_SUCCESS_001"

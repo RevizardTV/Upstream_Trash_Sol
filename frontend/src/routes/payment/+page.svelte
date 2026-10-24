@@ -110,7 +110,7 @@
     <main class="flex-1 p-6 md:p-10 overflow-y-auto w-full max-w-full">
         {#if isLoadingProfile}
             <!-- LOADING SKELETON -->
-            <div class="flex flex-col items-center justify-center h-full min-h-[400px] gap-3 text-slate-400">
+            <div class="flex flex-col items-center justify-center h-full min-h-100 gap-3 text-slate-400">
                 <i class="fa-solid fa-circle-notch fa-spin text-3xl text-emerald-500"></i>
                 <p class="text-sm font-medium">Loading user profile & account ledger...</p>
             </div>
