@@ -57,7 +57,7 @@
             {#if userUpi}
                 <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
                     <span class="text-slate-500">Payout UPI:</span>
-                    <span class="font-mono text-emerald-400 truncate max-w-[120px]">{userUpi}</span>
+                    <span class="font-mono text-emerald-400 truncate max-w-30">{userUpi}</span>
                 </div>
             {/if}
         </div>

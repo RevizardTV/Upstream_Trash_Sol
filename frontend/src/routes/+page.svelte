@@ -21,7 +21,8 @@
     <title>EcoRecycle - Home page</title>
 </svelte:head>
 
-<div class="min-h-screen flex flex-col justify-between">
+<!-- Added bg-slate-950 and text-stone-100 to unify the dark theme across the page and navbar -->
+<div class="min-h-screen flex flex-col justify-between bg-slate-950 text-stone-100">
     <Navbar onLoginClick={handleLoginRedirect} />
     <HeroSection onHowItWorksClick={handleSmoothScroll} />
     <PaytExplanation />

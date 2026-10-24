@@ -62,7 +62,7 @@
                                     {:else}
                                         <div class="inline-flex items-center justify-end">
                                             <span 
-                                                class="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 font-medium max-w-[240px] text-left"
+                                                class="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 font-medium max-w-60 text-left"
                                                 title={e.rejection_reason || 'Declined by district officer'}
                                             >
                                                 <i class="fa-solid fa-triangle-exclamation text-xs shrink-0"></i>
