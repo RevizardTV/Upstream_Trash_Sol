@@ -28,7 +28,6 @@
     let currentCategory = $derived(categories.find(c => c.id === selectedMaterial) || categories[0]);
     let liveTotal = $derived(typeof weight === 'number' ? currentCategory.rate * weight : 0);
 
-    // Optional: Listen for simulated MQTT / WebSocket events coming from the global layout
     onMount(() => {
         function handleIoTSensorEvent(e: CustomEvent) {
             const data = e.detail;
@@ -50,6 +49,50 @@
         };
     });
 
+    // Function to trigger Razorpay checkout popup for charges/fees
+    async function openRazorpayCheckout(amountInInr: number, entryId: number) {
+        try {
+            // 1. Call your backend to create a Razorpay order
+            const orderRes = await api.post('/api/payments/create-order', {
+                amount: amountInInr,
+                user_id: userId
+            });
+
+            const order = orderRes.data.order;
+
+            // 2. Configure Razorpay Checkout options
+            const options = {
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_dummy", // Public test key
+                amount: order.amount,
+                currency: order.currency,
+                name: "EcoRecycle PAYT System",
+                description: "Waste Disposal / Tipping Fee Payment",
+                order_id: order.id,
+                handler: async function (response: any) {
+                    // 3. Verify payment signature on backend upon success
+                    try {
+                        await api.post('/api/payments/verify-payment', {
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                            entry_id: entryId
+                        });
+                        alert('Payment successful and entry approved!');
+                        onSuccessSubmit();
+                    } catch (verifyErr) {
+                        alert('Payment verification failed on server.');
+                    }
+                },
+                theme: { color: "#10b981" }
+            };
+
+            const rzp = new (window as any).Razorpay(options);
+            rzp.open();
+        } catch (err) {
+            alert('Could not initialize Razorpay checkout gateway.');
+        }
+    }
+
     async function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         if (!userId) {
@@ -63,7 +106,8 @@
 
         isSubmitting = true;
         try {
-            await api.post('/api/recycling/entry', {
+            // 1. Post recycling entry to your FastAPI backend
+            const res = await api.post('/api/recycling/entry', {
                 user_id: userId,
                 waste_category: currentCategory.label,
                 weight_kg: weight,
@@ -72,10 +116,18 @@
                 payout_method: payoutMethod
             });
 
-            alert('Waste entry registered successfully!');
-            weight = '';
-            stationId = '';
-            onSuccessSubmit();
+            const entryId = res.data?.entry_id;
+
+            // 2. Conditional branch: If it's a negative value (Disposal Fee), open Razorpay Checkout
+            if (liveTotal < 0) {
+                await openRazorpayCheckout(Math.abs(liveTotal), entryId);
+            } else {
+                // Otherwise it's a positive payout reward
+                alert('Waste entry registered successfully! Payout queued.');
+                weight = '';
+                stationId = '';
+                onSuccessSubmit();
+            }
         } catch (err: any) {
             alert(`Error: ${err.response?.data?.detail || 'Submission failed'}`);
         } finally {
