@@ -4,6 +4,8 @@ from logging.handlers import RotatingFileHandler
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 import sys
+import io
+
 # Configure Log Formatter
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 formatter = logging.Formatter(LOG_FORMAT)
@@ -19,9 +21,15 @@ security_file_handler.setFormatter(formatter)
 security_file_handler.setLevel(logging.INFO)
 
 # --- Console Output Handler with UTF-8 Encoding Fix ---
-# Force standard output stream to use UTF-8 encoding to prevent Windows cp1252 charmap crashes on emojis
-utf8_stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
-console_handler = logging.StreamHandler(utf8_stdout)
+try:
+    if hasattr(sys.stdout, "fileno") and sys.stdout.fileno() >= 0:
+        utf8_stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
+        console_handler = logging.StreamHandler(utf8_stdout)
+    else:
+        console_handler = logging.StreamHandler(io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace'))
+except Exception:
+    console_handler = logging.StreamHandler(sys.stdout)
+
 console_handler.setFormatter(formatter)
 console_handler.setLevel(logging.INFO)
 
@@ -44,7 +52,6 @@ def extract_client_ip(request: Request) -> str:
     """Safely extracts the real client IP address considering proxy headers."""
     forwarded_for = request.headers.get("x-forwarded-for")
     if forwarded_for:
-        # Take the first IP in the comma-separated chain
         return forwarded_for.split(",")[0].strip()
     
     real_ip = request.headers.get("x-real-ip")
@@ -66,7 +73,6 @@ class PerformanceLoggingMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             process_time = (time.time() - start_time) * 1000
             
-            # Log endpoints taking longer than 200ms as warnings
             if process_time > 200:
                 logger.warning(
                     f"SLOW ENDPOINT: {request.method} {request.url.path} "

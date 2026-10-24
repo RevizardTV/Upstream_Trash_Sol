@@ -61,5 +61,9 @@ jobs:
           REDIS_URL: redis://localhost:6379
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EM_RESET_KEY: ${{ secrets.EM_RESET_KEY }}
+          RAZORPAY_TEST_API_KEY: ${{ secrets.RAZORPAY_TEST_API_KEY }}
+          RAZORPAY_TEST_SECRET_KEY: ${{ secrets.RAZORPAY_TEST_SECRET_KEY }}
         run: |
           pytest tests/unit
+          pytest tests/payment
+          pytest tests/iot
