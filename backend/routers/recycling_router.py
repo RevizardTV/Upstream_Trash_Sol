@@ -1,3 +1,4 @@
+# backend/routers/recycling_router.py
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from backend.database import get_db
 from backend.custom_logging import logger
 from backend.schemas import RecyclingEntrySchema
 from pdf_generator import generate_receipt_pdf
+from backend.routers.websocket_router import manager  # 1. Import the WebSocket manager
 
 router = APIRouter(prefix="/api/recycling", tags=["Recycling Transactions"])
 
@@ -26,9 +28,19 @@ async def add_recycling_entry(data: RecyclingEntrySchema, db: Session = Depends(
         status="pending"
     )
     db.add(new_entry)
-    db.commit()
-    db.refresh(new_entry)
-    return {"status": "success", "message": "Recycling transaction recorded!", "entry_id": new_entry.entry_id}
+    db.flush()           # Flushes the object to assign entry_id without expiring the session state
+    entry_id = new_entry.entry_id
+    db.commit()          # Finalizes transaction safely
+
+    # 2. CRITICAL: Broadcast the sensor telemetry update via WebSockets so listening clients/tests receive it
+    await manager.broadcast_sensor_event({
+        "type": "IOT_WEIGHT_UPDATE",
+        "station_id": new_entry.station_id,
+        "waste_category": new_entry.waste_category,
+        "weight_kg": float(new_entry.weight_kg)
+    })
+
+    return {"status": "success", "message": "Recycling transaction recorded!", "entry_id": entry_id}
 
 @router.get("/pending-payments")
 async def get_pending_payments(user_id: Optional[int] = Query(None), email: Optional[str] = Query(None), db: Session = Depends(get_db)):

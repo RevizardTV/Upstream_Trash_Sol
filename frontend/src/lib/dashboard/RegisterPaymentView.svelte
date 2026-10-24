@@ -1,5 +1,6 @@
 <script lang="ts">
     import api from '#lib/api';
+    import { onMount } from 'svelte';
 
     type Props = {
         userId: number | null;
@@ -14,6 +15,7 @@
     let payoutMethod = $state('upi');
     let isSubmitting = $state(false);
     let activeTip = $state<string | null>(null);
+    let sensorStatus = $state('Listening for smart bin telemetry...');
 
     const categories = [
         { id: 'plastic', label: 'Plastic', rate: 15.00, type: 'payout', icon: 'fa-bottle-water', color: 'emerald', tip: 'Ensure bottles are rinsed and flattened. Caps can be included.' },
@@ -25,6 +27,28 @@
 
     let currentCategory = $derived(categories.find(c => c.id === selectedMaterial) || categories[0]);
     let liveTotal = $derived(typeof weight === 'number' ? currentCategory.rate * weight : 0);
+
+    // Optional: Listen for simulated MQTT / WebSocket events coming from the global layout
+    onMount(() => {
+        function handleIoTSensorEvent(e: CustomEvent) {
+            const data = e.detail;
+            if (data && data.weight_kg) {
+                weight = data.weight_kg;
+                stationId = data.station_id || 'BIN-COIMBATORE-01';
+                const match = categories.find(c => c.label.toLowerCase() === data.waste_category.toLowerCase());
+                if (match) {
+                    selectedMaterial = match.id;
+                }
+                sensorStatus = `Live telemetry received from ${stationId}!`;
+                setTimeout(() => sensorStatus = 'Listening for smart bin telemetry...', 4000);
+            }
+        }
+
+        window.addEventListener('iot-sensor-update' as any, handleIoTSensorEvent as any);
+        return () => {
+            window.removeEventListener('iot-sensor-update' as any, handleIoTSensorEvent as any);
+        };
+    });
 
     async function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
@@ -61,9 +85,18 @@
 </script>
 
 <div class="space-y-8 w-full">
-    <header class="mb-8">
-        <h1 class="text-2xl md:text-3xl font-bold text-white">Register Waste Drop-Off</h1>
-        <p class="text-slate-400 text-sm mt-1">Log waste categories to calculate payouts or calculate PAYT municipal disposal charges.</p>
+    <header class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-white">Register Waste Drop-Off</h1>
+            <p class="text-slate-400 text-sm mt-1">Log waste categories to calculate payouts or calculate PAYT municipal disposal charges.</p>
+        </div>
+        <div class="bg-slate-900 border border-emerald-500/30 text-emerald-400 text-xs px-3 py-2 rounded-xl flex items-center gap-2 shadow-sm self-start">
+            <span class="relative flex h-2.5 w-2.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span>{sensorStatus}</span>
+        </div>
     </header>
 
     <form onsubmit={handleSubmit} class="w-full bg-slate-800/60 border border-slate-700/80 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
@@ -71,7 +104,7 @@
             <span id="category-group-label" class="block text-sm font-semibold text-slate-200 mb-4">1. Select Waste Category</span>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4" role="radiogroup" aria-labelledby="category-group-label">
                 {#each categories as cat}
-                    <label class={`cursor-pointer border rounded-xl p-4 flex flex-col items-center justify-between text-center gap-3 transition min-h-[140px] ${
+                    <label class={`cursor-pointer border rounded-xl p-4 flex flex-col items-center justify-between text-center gap-3 transition min-h-35 ${
                         selectedMaterial === cat.id 
                             ? (cat.type === 'charge' ? 'border-rose-500 bg-rose-500/10' : 'border-emerald-500 bg-emerald-500/10')
                             : 'border-slate-700/80 bg-slate-800/40 hover:border-slate-500'

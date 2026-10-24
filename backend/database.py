@@ -1,29 +1,40 @@
+# backend/database.py
 from decimal import Decimal
 from typing import Generator
 import os
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import StaticPool
 from backend.config import config
 
-# SSL Configuration
+# 1. Determine Database URL
+db_url = os.getenv("DATABASE_URL", config.DB_URL)
+
+# SSL Configuration (only applied if not using SQLite)
 ssl_args = {}
 ca_path = "/etc/ssl/certs/ca-certificates.crt"
 
-if os.path.exists(ca_path):
+if not db_url.startswith("sqlite") and os.path.exists(ca_path):
     ssl_args = {"ssl": {"ca": ca_path}}
 
-# 1. Engine Creation
+# 2. Engine Creation (Use StaticPool for in-memory SQLite to share data across test threads)
+is_sqlite_mem = db_url == "sqlite:///:memory:" or db_url == "sqlite://"
+
+connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else ssl_args
+pool_class = StaticPool if is_sqlite_mem else None
+
 engine = create_engine(
-    config.DB_URL,
-    connect_args=ssl_args,
+    db_url,
+    connect_args=connect_args,
+    poolclass=pool_class,
     pool_pre_ping=True,
 )
 
-# 2. Session Factory
+# 3. Session Factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 3. Database Dependency
+# 4. Database Dependency
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
@@ -31,7 +42,7 @@ def get_db() -> Generator[Session, None, None]:
     finally:
         db.close()
 
-# 4. Connection Test & Initialization
+# 5. Connection Test & Initialization
 def test_connection():
     try:
         with engine.connect() as connection:

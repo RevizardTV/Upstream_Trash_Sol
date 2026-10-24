@@ -3,42 +3,43 @@ import os
 import pytest
 import fakeredis.aioredis
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-# 1. Set Testing Environment Variables
+# 1. Force testing environment variables BEFORE importing app modules
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["REDIS_URL"] = "redis://localhost:6379"
 os.environ["EM_RESET_KEY"] = "test_secret_key"
 os.environ["RESEND_API_KEY"] = "re_test_dummy_key"
 
+from sqlalchemy.orm import sessionmaker
+
 from backend.main import app
+import backend.models  # Registers all models to Base.metadata[cite: 6]
 from backend.models import Base
-from backend.database import get_db
+from backend.database import get_db, engine as app_engine
 from tests.factories import TestSession
 
-# 2. In-Memory SQLite Database for Fast Testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+# 2. Bind factory_boy to the shared app_engine so everything targets the same in-memory DB
+TestSession.configure(bind=app_engine)
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=app_engine)
 
-# Configure factory_boy session globally to bind to the engine
-TestSession.configure(bind=engine)
+
+@pytest.fixture(scope="function", autouse=True)
+def setup_database():
+    """Automatically create all tables on the shared app engine before each test and drop them after."""
+    Base.metadata.create_all(bind=app_engine)
+    yield
+    Base.metadata.drop_all(bind=app_engine)
 
 
 @pytest.fixture(scope="function")
-def db_session():
-    """Provides an isolated in-memory database session for each test."""
-    Base.metadata.create_all(bind=engine)
+def db_session(setup_database):
+    """Provides an isolated database session for each test using the shared app engine."""
     db = TestingSessionLocal()
-    
     try:
         yield db
     finally:
         db.close()
-        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture(scope="function")
