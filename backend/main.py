@@ -17,7 +17,7 @@ from backend.debug import router as debug_router
 from backend.config import config
 
 # Import Split Routers
-from backend.routers import auth_router, user_router, staff_router, recycling_router
+from backend.routers import auth_router, user_router, staff_router, recycling_router,websocket_router
 
 # Logging Utilities
 from backend.custom_logging import PerformanceLoggingMiddleware, logger, extract_client_ip
@@ -102,6 +102,7 @@ app.add_middleware(
 
 # Include Debug and Feature Routers
 app.include_router(debug_router)
+app.include_router(websocket_router.router)
 app.include_router(auth_router.router)
 app.include_router(user_router.router)
 app.include_router(staff_router.router)

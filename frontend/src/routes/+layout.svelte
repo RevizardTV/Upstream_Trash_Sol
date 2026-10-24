@@ -1,15 +1,17 @@
 <script lang="ts">
     import '../app.css';
     import api from '#lib/api';
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import { goto } from '$app/navigation';
     import { page } from '$app/state';
+    import { createWebSocketConnection } from '#lib/websocket';
 
     // Configure global api defaults for all components across the app
     api.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
     api.defaults.withCredentials = true;
 
     let { children } = $props();
+    let socket: WebSocket | null = null;
 
     onMount(() => {
         const publicPaths = ['/login', '/staff-login', '/register', '/register-staff', '/register-profile', '/'];
@@ -24,7 +26,32 @@
 
         if (!userId && !verifiedEmail && !staffEmail && !hasSessionCookie) {
             goto('/login');
+            return;
         }
+
+        // Initialize global WebSocket connection once authenticated/loaded
+        socket = createWebSocketConnection('/ws/chat');
+
+        socket.onopen = () => {
+            console.log('Global WebSocket connected.');
+        };
+
+        socket.onmessage = (event) => {
+            console.log('Global WebSocket message received:', event.data);
+            // Handle global notifications, background events, or store updates here
+        };
+
+        socket.onerror = (error) => {
+            console.error('Global WebSocket error:', error);
+        };
+
+        socket.onclose = () => {
+            console.log('Global WebSocket disconnected.');
+        };
+    });
+
+    onDestroy(() => {
+        socket?.close();
     });
 </script>
 
