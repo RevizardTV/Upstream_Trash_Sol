@@ -39,3 +39,19 @@ class EntryReviewSchema(BaseModel):
     action: str  
     rejection_reason: Optional[str] = None
     staff_id: Optional[int] = None
+    
+    
+class OrderCreateSchema(BaseModel):
+    amount: float = Field(..., gt=0, description="Amount in INR to create an order for")
+    user_id: int
+
+class PaymentVerifySchema(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    entry_id: Optional[int] = None
+
+class UPIPayoutSchema(BaseModel):
+    user_id: int
+    upi_id: str = Field(..., description="UPI VPA handle", examples=["user@upi"])
+    amount: float = Field(..., gt=0, description="Payout amount in INR")
