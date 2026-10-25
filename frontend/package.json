@@ -20,7 +20,7 @@
     "@types/bun": "latest",
     "svelte": "^5.57.1",
     "svelte-check": "^4.6.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vite": "^8.3.0"
   },
   "imports": {
